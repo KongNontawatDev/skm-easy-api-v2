@@ -1,0 +1,34 @@
+###############################################################################
+# ชำระเงิน — QR PromptPay (ลูกค้าโอนนอกระบบ; การตัดงวดทำที่ระบบองค์กร)
+#
+# flow:
+#   1) POST /me/payments/qr → payload สร้าง QR ฝั่งแอป
+#   2) ลูกค้าโอนจริง
+#   3) ระบบตัดงวดขององค์กรรับ bill payment แล้วตัดงวดในฐานเดิม
+#   4) ระบบนั้น POST /integrations/installment-notify → แจ้ง LINE / in-app (ดู installment-notify.http)
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+@customerToken =
+
+### ✅ SUCCESS — สร้าง QR payload (ต้องตั้ง PROMPTPAY_BILLER_ID)
+POST {{baseUrl}}/me/payments/qr
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "amountBaht": 1500.5
+}
+
+### ❌ FAIL — ยอดไม่เป็นบวก
+POST {{baseUrl}}/me/payments/qr
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "amountBaht": -100
+}
+
+### ❌ FAIL — ไม่มี PROMPTPAY_BILLER_ID → 400
+# (รันเมื่อ env ไม่ครบ)

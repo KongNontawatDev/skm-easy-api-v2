@@ -1,0 +1,58 @@
+###############################################################################
+# Edge cases — JSON / header / method / payload ผิดปกติ
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+@customerToken =
+
+### ❌ INVALID JSON
+POST {{baseUrl}}/auth/customer/otp/request
+Content-Type: application/json
+
+{ not json at all
+
+### ❌ WRONG Content-Type (บาง client ส่ง text/plain)
+POST {{baseUrl}}/auth/customer/otp/request
+Content-Type: text/plain
+
+{"phone":"0812345678"}
+
+### ❌ WRONG HTTP method
+PUT {{baseUrl}}/auth/customer/otp/request
+Content-Type: application/json
+
+{"phone":"0812345678"}
+
+### ❌ NULL phone (JSON null)
+POST {{baseUrl}}/auth/customer/otp/request
+Content-Type: application/json
+
+{
+  "phone": null
+}
+
+### ❌ SPECIAL STRING — ห้ามทำให้ SQL injection สำเร็จ; ค่าถูก bind เป็น parameter
+POST {{baseUrl}}/auth/customer/otp/request
+Content-Type: application/json
+
+{
+  "phone": "'; DROP TABLE acc_cus; --"
+}
+
+### ❌ LARGE BODY — description เกิน 5000 ตัวอักษร → 422
+# แนบไฟล์ข้อความยาวเอง หรือ generate ใน editor — ตัวอย่างนี้ใช้ placeholder
+POST {{baseUrl}}/me/support/tickets
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "title": "ทดสอบความยาว",
+  "description": "PASTE_6001_CHARS_HERE"
+}
+
+### 🔁 RATE LIMIT — ยิง public route ซ้ำเร็ว ๆ (ต้องมี Authorization ถ้าเป็น protected)
+# รัน GET /public/promotions หรือ GET /me/contracts ซ้ำ ๆ จนเกิน RATE_LIMIT_MAX ต่อ path
+
+### ❌ PATH TRAVERSAL ลองกับ static files (ถ้าเปิด local storage)
+# GET {{host}}/files/../../../etc/passwd

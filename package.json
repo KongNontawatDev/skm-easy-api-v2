@@ -1,0 +1,55 @@
+{
+  "name": "skm-easy-api-v2",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "start": "node dist/server.js",
+    "release": "prisma migrate deploy",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:seed": "prisma db seed",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "test:admin-auth": "tsx scripts/test-admin-better-auth.ts",
+    "test:admin-profile-reset": "tsx scripts/test-admin-profile-password-reset.ts",
+    "test:cms-upload": "tsx scripts/test-cms-upload-sanity.ts",
+    "test:thaibulk-otp": "tsx scripts/test-thaibulksms-otp-request.ts",
+    "seed:legacy-sample": "tsx scripts/seed-legacy-sample.ts"
+  },
+  "dependencies": {
+    "@better-auth/prisma-adapter": "^1.6.5",
+    "@hono/node-server": "^1.19.14",
+    "@hono/swagger-ui": "^0.6.1",
+    "@hono/zod-openapi": "^1.3.0",
+    "@prisma/adapter-mariadb": "^7.7.0",
+    "@prisma/client": "^7.7.0",
+    "bcryptjs": "^3.0.3",
+    "better-auth": "^1.6.5",
+    "cors": "^2.8.6",
+    "dayjs": "^1.11.20",
+    "dotenv": "^17.4.2",
+    "handlebars": "^4.7.9",
+    "hono": "^4.12.14",
+    "jsonwebtoken": "^9.0.3",
+    "mariadb": "^3.4.5",
+    "nodemailer": "^8.0.5",
+    "prisma": "^7.7.0",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.6.0",
+    "@types/nodemailer": "^8.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}

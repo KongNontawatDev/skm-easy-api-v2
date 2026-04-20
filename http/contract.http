@@ -1,0 +1,31 @@
+###############################################################################
+# สัญญา (legacy SQL) — ต้องใช้ JWT ลูกค้า
+# รายละเอียดสัญญา: ระบบตรวจว่า contractRef อยู่ในรายการสัญญาของลูกค้า (กัน IDOR)
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+@customerToken =
+@adminToken =
+@contractRef = DEMO-CONTRACT-001
+
+### ✅ SUCCESS — รายการสัญญาของลูกค้า
+GET {{baseUrl}}/me/contracts
+Authorization: Bearer {{customerToken}}
+
+### ✅ SUCCESS — รายละเอียดสัญญา (ต้องเป็นสัญญาของตัวเอง)
+GET {{baseUrl}}/me/contracts/{{contractRef}}
+Authorization: Bearer {{customerToken}}
+
+### ❌ FAIL — token แอดมินเข้า route ลูกค้า (role ไม่ใช่ customer หรือ invalid)
+GET {{baseUrl}}/me/contracts/{{contractRef}}
+Authorization: Bearer {{adminToken}}
+
+### ❌ FAIL — สัญญาของคนอื่น / ref ที่ไม่อยู่ใน list → 403 Forbidden
+# ทดสอบ SQL injection ใน path: ค่าจะถูก bind เป็น string เดียวใน legacy SQL — ไม่ควร execute หลาย statement
+GET {{baseUrl}}/me/contracts/%27%20OR%201%3D1%20--
+Authorization: Bearer {{customerToken}}
+
+### ❌ EDGE — contractRef ว่าง (path ไม่ตรง route อาจได้ 404)
+GET {{baseUrl}}/me/contracts/
+Authorization: Bearer {{customerToken}}

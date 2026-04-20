@@ -1,0 +1,20 @@
+###############################################################################
+# Health — อยู่นอก /api/v1 (root ของเซิร์ฟเวอร์)
+###############################################################################
+
+@host = http://127.0.0.1:3000
+
+### ✅ SUCCESS — สุขภาพรวม (200 หรือ 503 ถ้า dependency พัง)
+GET {{host}}/health
+
+### ✅ SUCCESS — ตรวจเฉพาะ Redis
+GET {{host}}/health/deps/redis
+
+### ✅ SUCCESS — ตรวจเฉพาะ database
+GET {{host}}/health/deps/database
+
+### ❌ FAIL — component ไม่รู้จัก → 404
+GET {{host}}/health/deps/invalid
+
+### 📊 Metrics (ถ้า METRICS_ENABLED=true)
+GET {{host}}/metrics

@@ -1,0 +1,19 @@
+###############################################################################
+# Admin API — ทุก path ภายใต้ /api/v1/admin/* ต้อง JWT พนักงาน + requireStaff + permission ตาม route
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+@adminToken =
+@customerToken =
+
+### ✅ SUCCESS — สรุปแดชบอร์ด
+GET {{baseUrl}}/admin/dashboard/summary
+Authorization: Bearer {{adminToken}}
+
+### ❌ SECURITY — ไม่มี token
+GET {{baseUrl}}/admin/dashboard/summary
+
+### ❌ SECURITY — ใช้ token ลูกค้า
+GET {{baseUrl}}/admin/dashboard/summary
+Authorization: Bearer {{customerToken}}

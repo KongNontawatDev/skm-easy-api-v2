@@ -1,0 +1,33 @@
+###############################################################################
+# โปรโมชัน — สาธารณะ + แอดมิน (รายการ/สร้าง)
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+@adminToken =
+@customerToken =
+
+### ✅ SUCCESS — รายการโปรโมชันที่ active + อยู่ในช่วงวันที่ (public)
+GET {{baseUrl}}/public/promotions
+
+### ✅ SUCCESS — รายการโปรโมชันแอดมิน (ทุกแถวล่าสุด)
+GET {{baseUrl}}/admin/promotions
+Authorization: Bearer {{adminToken}}
+
+### ✅ SUCCESS — สร้างโปรโมชัน
+POST {{baseUrl}}/admin/promotions
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "HTTP Test Promo",
+  "description": "สร้างจากชุดทดสอบ REST Client",
+  "isActive": true
+}
+
+### ❌ FAIL — ไม่มี token แอดมิน
+GET {{baseUrl}}/admin/promotions
+
+### ❌ FAIL — customer token เข้า admin route → 403
+GET {{baseUrl}}/admin/promotions
+Authorization: Bearer {{customerToken}}

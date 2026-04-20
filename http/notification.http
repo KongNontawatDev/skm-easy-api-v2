@@ -1,0 +1,31 @@
+###############################################################################
+# แจ้งเตือน in-app — ใช้ JWT ใดก็ได้ที่มี sub = user id ในระบบแจ้งเตือน
+# ลูกค้าแอป: sub = legacy customer id (ตรงกับ user_id ใน notifications)
+# แอดมิน: sub = Prisma User id (ถ้ามีแถวแจ้งเตือนในระบบเดิม)
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+@customerToken =
+@adminToken =
+@notificationId =
+
+### ✅ SUCCESS — รายการแจ้งเตือน (แบ่งหน้า)
+GET {{baseUrl}}/notifications?page={{page}}&limit={{limit}}
+Authorization: Bearer {{customerToken}}
+
+### ✅ SUCCESS — default pagination
+GET {{baseUrl}}/notifications
+Authorization: Bearer {{customerToken}}
+
+### ❌ FAIL — page เกิน MAX
+GET {{baseUrl}}/notifications?page=999999&limit=20
+Authorization: Bearer {{customerToken}}
+
+### ✅ SUCCESS — ทำเครื่องหมายอ่านแล้ว
+PATCH {{baseUrl}}/notifications/{{notificationId}}/read
+Authorization: Bearer {{customerToken}}
+
+### ❌ FAIL — id ไม่มี
+PATCH {{baseUrl}}/notifications/000000000000000000000000/read
+Authorization: Bearer {{customerToken}}

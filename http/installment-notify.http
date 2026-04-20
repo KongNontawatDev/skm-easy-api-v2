@@ -1,0 +1,53 @@
+###############################################################################
+# ระบบตัดงวด → POST /api/v1/integrations/installment-notify
+#
+# Auth (เลือกอย่างใดอย่างหนึ่ง):
+#   Authorization: Bearer <INSTALLMENT_INTEGRATION_SECRET>
+#   หรือ
+#   X-Installment-Integration-Secret: <INSTALLMENT_INTEGRATION_SECRET>
+#
+# ต้องตั้งค่า INSTALLMENT_INTEGRATION_SECRET ใน env (ความยาว ≥ 16)
+# กันซ้ำ: ส่ง requestId (สตริง 8–200 ตัว) — ค่าเดิมภายใน 10 นาทีได้ duplicate: true
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+@installmentSecret = CHANGE_ME_MIN_16_CHARS
+
+### ✅ แจ้งตัดงวดสำเร็จ (Flex เริ่มต้น INSTALLMENT_POSTED)
+POST {{baseUrl}}/integrations/installment-notify
+Content-Type: application/json
+Authorization: Bearer {{installmentSecret}}
+
+{
+  "cusId": "COMPID:IDNO",
+  "status": "POSTED",
+  "contractRef": "BRANID:CONTNO",
+  "installmentRef": "1",
+  "amountBaht": 3500.5,
+  "requestId": "post-{{$timestamp}}"
+}
+
+### ✅ ใบแจ้งหนี้ (Flex INVOICE — ตั้ง LINE_LIFF_INVOICE_URL หรือส่ง invoiceLiffUri)
+POST {{baseUrl}}/integrations/installment-notify
+Content-Type: application/json
+X-Installment-Integration-Secret: {{installmentSecret}}
+
+{
+  "cusId": "COMPID:IDNO",
+  "status": "DUE",
+  "lineFlexKind": "INVOICE",
+  "contractRef": "BRANID:CONTNO",
+  "installmentRef": "3",
+  "dueDate": "30 เม.ย. 2569",
+  "amountBaht": 5000,
+  "requestId": "inv-{{$timestamp}}"
+}
+
+### ❌ ไม่มี secret → 401
+POST {{baseUrl}}/integrations/installment-notify
+Content-Type: application/json
+
+{ "cusId": "X", "status": "POSTED" }
+
+### ❌ ยังไม่ตั้ง INSTALLMENT_INTEGRATION_SECRET ใน env → 503

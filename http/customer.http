@@ -1,0 +1,104 @@
+###############################################################################
+# ลูกค้าแอป — OTP (เบอร์) + JWT customer
+# ต้องมี LEGACY_ACC_CUS_BY_PHONE_SQL + Thai Bulk (OTP provider หรือ /sms)
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+
+### ✅ SUCCESS — ขอ OTP (เบอร์ต้องมีใน legacy DB)
+# @name customerOtpRequest
+# คัดลอก data.refCode → @customerOtpRef
+POST {{baseUrl}}/auth/customer/otp/request
+Content-Type: application/json
+
+{
+  "phone": "{{customerPhone}}"
+}
+
+### ❌ FAIL — เบอร์สั้นเกินไป (Zod)
+POST {{baseUrl}}/auth/customer/otp/request
+Content-Type: application/json
+
+{
+  "phone": "08"
+}
+
+### ❌ FAIL — เบอร์ไม่อยู่ในระบบ legacy → 401
+POST {{baseUrl}}/auth/customer/otp/request
+Content-Type: application/json
+
+{
+  "phone": "0999999999"
+}
+
+### ❌ FAIL — rate limit ขอ OTP บ่อย (ยิงซ้ำหลายครั้งตาม OTP_RATE_LIMIT_*)
+POST {{baseUrl}}/auth/customer/otp/request
+Content-Type: application/json
+
+{
+  "phone": "{{customerPhone}}"
+}
+
+### ✅ SUCCESS — ยืนยัน OTP (ใส่ otpCode จาก SMS)
+# @name customerOtpVerify
+# คัดลอก data.accessToken → @customerToken
+POST {{baseUrl}}/auth/customer/otp/verify
+Content-Type: application/json
+
+{
+  "phone": "{{customerPhone}}",
+  "refCode": "{{customerOtpRef}}",
+  "otpCode": "123456"
+}
+
+### ❌ FAIL — refCode ผิด
+POST {{baseUrl}}/auth/customer/otp/verify
+Content-Type: application/json
+
+{
+  "phone": "{{customerPhone}}",
+  "refCode": "0000000",
+  "otpCode": "123456"
+}
+
+### ❌ FAIL — OTP ผิด (ถึงเกิน OTP_VERIFY_MAX_ATTEMPTS จะได้ 429)
+POST {{baseUrl}}/auth/customer/otp/verify
+Content-Type: application/json
+
+{
+  "phone": "{{customerPhone}}",
+  "refCode": "{{customerOtpRef}}",
+  "otpCode": "000000"
+}
+
+### ✅ SUCCESS — โปรไฟล์ลูกค้า (legacy row ตามเบอร์ใน JWT)
+GET {{baseUrl}}/me/profile
+Authorization: Bearer {{customerToken}}
+
+### ❌ FAIL — ไม่มี Authorization
+GET {{baseUrl}}/me/profile
+
+###############################################################################
+# ผูก LINE (หลังล็อกอิน) — อัปเดต legacy ผ่าน LEGACY_LINE_LINK_UPDATE_SQL
+###############################################################################
+
+### ✅ SUCCESS — ผูก LINE user กับลูกค้า legacy
+POST {{baseUrl}}/me/line/link
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "lineUserId": "Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "lineUserName": "Tester",
+  "lineUserProfile": "https://profile.line-scdn.net/..."
+}
+
+### ❌ FAIL — lineUserId สั้นเกินไป
+POST {{baseUrl}}/me/line/link
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "lineUserId": "ab"
+}

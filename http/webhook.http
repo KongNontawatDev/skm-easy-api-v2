@@ -1,0 +1,34 @@
+###############################################################################
+# Webhook เข้า — POST /api/v1/webhooks/inbound
+# ลายเซ็น: header X-Webhook-Signature หรือ x-webhook-signature = sha256=<hex>
+# สร้างลายเซ็น (Node):
+#   node -e "const c=require('crypto');const p=process.argv[1];const s=process.env.WEBHOOK_SIGNING_SECRET||'dev';console.log('sha256='+c.createHmac('sha256',s).update(p).digest('hex'))" '{"event":"test","data":{}}'
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+
+### ❌ FAIL — ไม่มีลายเซ็น
+POST {{baseUrl}}/webhooks/inbound
+Content-Type: application/json
+
+{"event":"ping","data":{}}
+
+### ❌ FAIL — ลายเซ็นผิด
+POST {{baseUrl}}/webhooks/inbound
+Content-Type: application/json
+X-Webhook-Signature: sha256=0000000000000000000000000000000000000000000000000000000000000000
+
+{"event":"ping","data":{}}
+
+### ✅ SUCCESS — payload + ลายเซ็นที่ถูกต้อง (แทนที่ signature ด้วยค่าจากคำสั่ง node ด้านบน)
+POST {{baseUrl}}/webhooks/inbound
+Content-Type: application/json
+X-Webhook-Signature: sha256=PASTE_HEX_HERE
+
+{"event":"payment.test","data":{"foo":"bar"},"webhookId":"wh-test-{{$timestamp}}","issuedAt": {{$timestamp}}}
+
+### ✅ DUPLICATE — webhookId เดิมภายใน 10 นาที → success แต่ duplicate: true
+# รันคำขอด้านบนซ้ำโดยไม่เปลี่ยน webhookId
+
+# แจ้งเตือนหลังตัดงวด — ไม่ใช้ path นี้ ดู installment-notify.http

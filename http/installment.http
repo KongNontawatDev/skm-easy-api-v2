@@ -1,0 +1,19 @@
+###############################################################################
+# งวดผ่อน — GET ตามสัญญา (legacy SQL) + สิทธิ์เดียวกับสัญญา
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+@customerToken =
+@contractRef = DEMO-CONTRACT-001
+
+### ✅ SUCCESS — รายการงวดของสัญญา
+GET {{baseUrl}}/me/contracts/{{contractRef}}/installments
+Authorization: Bearer {{customerToken}}
+
+### ❌ FAIL — สัญญาไม่ใช่ของลูกค้า → 403
+GET {{baseUrl}}/me/contracts/OTHER-CUSTOMER-CONTRACT/installments
+Authorization: Bearer {{customerToken}}
+
+### ❌ FAIL — ไม่มี token
+GET {{baseUrl}}/me/contracts/{{contractRef}}/installments

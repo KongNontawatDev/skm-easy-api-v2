@@ -1,0 +1,21 @@
+###############################################################################
+# E2E แนวทางจำลองผู้ใช้จริง (คัดลอกค่าข้ามขั้นด้วยมือ — REST Client ไม่แชร์ตัวแปรข้ามไฟล์อัตโนมัติ)
+#
+# ลำดับ:
+#   1) auth.http        → POST /auth/login → เก็บ accessToken → @adminToken
+#   2) customer.http    → POST .../otp/request → refCode → @customerOtpRef
+#                       → POST .../otp/verify (ใส่ OTP จริง) → @customerToken
+#   3) contract.http    → GET /me/contracts → เลือก contractRef จริง → แก้ variables
+#   4) installment.http → GET งวด
+#   5) payment.http     → POST /me/payments/qr (ลูกค้าโอนนอกระบบ)
+#   6) installment-notify.http → POST /integrations/installment-notify (จำลองระบบตัดงวด)
+#   7) notification.http → GET notifications (ลูกค้าเห็นข้อความ)
+#
+# Worker: ต้องรัน `npm run worker` แยก terminal เพื่อให้ LINE job ถูกประมวลผล
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+
+### ขั้นตอนเดียว — health ก่อนเริ่ม
+GET {{host}}/health

@@ -1,0 +1,241 @@
+// =============================================================================
+// SKM Easy API — Prisma schema (โดเมนที่ใช้งานจริง: ผู้ใช้ภายใน, OTP, CMS, ลูกค้าแอป, audit)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// -----------------------------------------------------------------------------
+// ผู้ใช้ระบบภายใน (แอดมิน/พนักงาน) — สิทธิ์แบบ staff ใช้ฟิลด์ isStaff
+// -----------------------------------------------------------------------------
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String?
+  name         String?
+  phone        String?
+  lineUserId   String?   @unique
+  isStaff      Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  otps      Otp[]
+  auditLogs AuditLog[]
+
+  @@index([deletedAt])
+  @@index([email])
+  @@index([lineUserId])
+}
+
+model Otp {
+  id         String    @id @default(cuid())
+  userId     String?
+  email      String
+  codeHash   String
+  purpose    String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email, purpose])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  ip         String?
+  userAgent  String?
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// แอปลูกค้า + CMS + support
+// -----------------------------------------------------------------------------
+
+model OtpVerification {
+  id         String    @id @default(cuid())
+  phone      String
+  /** `bcrypt(...)` หรือ `TBS:<token>` เมื่อใช้ Thai Bulk OTP API */
+  otpCode    String    @map("otp_code") @db.VarChar(191)
+  refCode    String    @map("ref_code")
+  expiresAt  DateTime  @map("expires_at")
+  verifiedAt DateTime? @map("verified_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([phone, refCode])
+  @@index([expiresAt])
+  @@map("otp_verifications")
+}
+
+model CustomerAppNotification {
+  id        String   @id @default(cuid())
+  /** รหัสลูกค้า legacy จาก `acct_cust` — ค่าเดียวกับ JWT `sub` (เช่น `COMPID:IDNO` หรือ `IDNO` ตาม SQL) */
+  idno      String   @map("idno") @db.VarChar(255)
+  title     String   @db.VarChar(500)
+  message   String   @db.LongText
+  type      String   @db.VarChar(64)
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([idno, isRead])
+  @@map("notifications")
+}
+
+model Promotion {
+  id          String    @id @default(cuid())
+  title       String
+  description String    @db.LongText
+  image       String?   @db.VarChar(2048)
+  startDate   DateTime? @map("start_date")
+  endDate     DateTime? @map("end_date")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([isActive, startDate, endDate])
+  @@map("promotions")
+}
+
+model Article {
+  id          String    @id @default(cuid())
+  title       String
+  content     String    @db.LongText
+  coverImage  String?   @map("cover_image") @db.VarChar(2048)
+  publishedAt DateTime? @map("published_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([publishedAt])
+  @@map("articles")
+}
+
+model SupportTicket {
+  id          String   @id @default(cuid())
+  /** รหัสลูกค้า legacy จาก `acct_cust` — ค่าเดียวกับ JWT `sub` */
+  idno        String   @map("idno") @db.VarChar(255)
+  title       String
+  description String   @db.LongText
+  status      String   @db.VarChar(32)
+  adminReply  String?  @map("admin_reply") @db.LongText
+  /** URL รูปประกอบเดียว (เช่น `/api/v1/public/files/support-tickets/...`) */
+  imageUrl    String?  @map("image_url") @db.VarChar(2048)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([idno, status])
+  @@map("support_tickets")
+}
+
+model AppGuide {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @db.LongText
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([sortOrder])
+  @@map("app_guides")
+}
+
+/** ผูก LINE (LIFF) กับลูกค้า legacy — สูงสุด 2 บัญชีไลน์ต่อ 1 legacy_customer_id */
+model CustomerLiffLink {
+  id                 String   @id @default(cuid())
+  legacyCustomerId   String   @map("legacy_customer_id") @db.VarChar(255)
+  lineUserId         String   @unique @map("line_user_id") @db.VarChar(255)
+  customerPhone      String   @map("customer_phone") @db.VarChar(20)
+  lineDisplayName    String?  @map("line_display_name") @db.VarChar(255)
+  linePictureUrl     String?  @map("line_picture_url") @db.VarChar(2000)
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([legacyCustomerId])
+  @@map("customer_liff_links")
+}
+
+// -----------------------------------------------------------------------------
+// แอดมิน back-office — Better Auth (แยกจากตาราง `User` ของระบบเดิม)
+// -----------------------------------------------------------------------------
+
+model AdminAuthUser {
+  id            String             @id
+  name          String             @db.Text
+  email         String
+  emailVerified Boolean            @default(false)
+  image         String?            @db.Text
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  sessions      AdminAuthSession[]
+  accounts      AdminAuthAccount[]
+
+  @@unique([email])
+  @@map("admin_auth_user")
+}
+
+model AdminAuthSession {
+  id        String        @id
+  expiresAt DateTime
+  token     String        @db.VarChar(500)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  ipAddress String?       @db.Text
+  userAgent String?       @db.Text
+  userId    String
+  user      AdminAuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId(length: 191)])
+  @@map("admin_auth_session")
+}
+
+model AdminAuthAccount {
+  id                    String        @id
+  accountId             String        @db.Text
+  providerId            String        @db.Text
+  userId                String
+  user                  AdminAuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?       @db.Text
+  refreshToken          String?       @db.Text
+  idToken               String?       @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?       @db.Text
+  password              String?       @db.Text
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@index([userId(length: 191)])
+  @@map("admin_auth_account")
+}
+
+model AdminAuthVerification {
+  id         String   @id
+  identifier String   @db.Text
+  value      String   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier(length: 191)])
+  @@map("admin_auth_verification")
+}

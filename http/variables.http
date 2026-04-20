@@ -1,0 +1,39 @@
+###############################################################################
+# SKM Easy API — ตัวแปรใช้ร่วมทุกไฟล์ในโฟลเดอร์ http/
+#
+# วิธีใช้ (VS Code / IntelliJ HTTP Client):
+#   1) ตั้ง @host ให้ตรงกับเซิร์ฟเวอร์ (พอร์ตชนให้เปลี่ยน เช่น 3001)
+#   2) รันลำดับใน flow-e2e.http หรือคัดลอกค่า accessToken / refCode มาใส่ด้านล่าง
+#   3) อัปโหลด multipart → ดู uploads.http
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+
+# --- ลูกค้าแอป (JWT หลัง POST /auth/customer/otp/verify) ---
+@customerToken =
+@customerOtpRef =
+@customerPhone = 0812345678
+
+# --- สัญญา/งวด (ต้องตรงกับข้อมูล legacy + สิทธิ์ลูกค้า — ปรับตาม env) ---
+@contractRef = DEMO-CONTRACT-001
+@installmentRef = 1
+@paymentClaimId =
+
+# --- พนักงาน/แอดมิน (JWT หลัง POST /auth/login) ---
+@adminToken =
+@adminEmail = admin@example.com
+@adminPassword = change-me-in-seed
+
+# --- Refresh (แอดมิน) ---
+@refreshToken =
+
+# --- Webhook inbound (ค่าเดียวกับ WEBHOOK_SIGNING_SECRET ใน .env) ---
+@webhookSecret = your-webhook-signing-secret-min-16-chars
+
+# --- Idempotency (บาง route อาจรองรับในอนาคต — แจ้งโอนใช้ Redis lock ภายใน ไม่ใช้ header นี้) ---
+@idempotencyKey = e2e-test-{{$timestamp}}
+
+# --- Pagination (notifications) ---
+@page = 1
+@limit = 20

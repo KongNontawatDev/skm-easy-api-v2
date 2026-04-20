@@ -1,0 +1,110 @@
+###############################################################################
+# Auth — บัญชีพนักงาน/แอดมิน (Prisma User) + LINE OAuth callback + OTP อีเมล
+# ลูกค้าแอป (เบอร์โทร + ThaiBulkSMS) อยู่ที่ customer.http
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+
+### ✅ SUCCESS — ลงทะเบียนแอดมิน (ถ้า seed ปิดการลงทะเบียนหรือซ้ำอีเมลจะได้ error)
+# @name registerAdmin
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "new-staff@example.com",
+  "password": "SecurePass123",
+  "name": "ทดสอบ"
+}
+
+### ✅ SUCCESS — เข้าสู่ระบบแอดมิน (นำ accessToken ไปใส่ @adminToken ใน variables.http)
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+### ✅ SUCCESS — ต่ออายุ access token
+# ใช้ refreshToken จากผล login
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### ❌ FAIL — login รหัสผ่านผิด
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "WrongPassword!!!"
+}
+
+### ❌ FAIL — body ไม่มี email
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "password": "x"
+}
+
+### ✅ SUCCESS — ขอ OTP อีเมล (แอดมิน flow — ส่งผ่านคิวอีเมล)
+POST {{baseUrl}}/auth/otp/request
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "purpose": "login"
+}
+
+### ❌ FAIL — purpose ไม่ถูกต้อง (นอก enum)
+POST {{baseUrl}}/auth/otp/request
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "purpose": "hack"
+}
+
+### ✅ SUCCESS — ยืนยัน OTP อีเมล (ต้องใส่ code จริงจาก DB หรืออีเมล)
+POST {{baseUrl}}/auth/otp/verify
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "code": "000000",
+  "purpose": "login"
+}
+
+### ❌ FAIL — code ผิดความยาว
+POST {{baseUrl}}/auth/otp/verify
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "code": "12",
+  "purpose": "login"
+}
+
+### ✅ / ❌ — LINE OAuth callback (staff) — ต้องมี code จริงจาก LINE
+# จำลอง payload ถูกต้องตาม schema; ใน production แลก code ผ่าน frontend
+POST {{baseUrl}}/auth/line/callback
+Content-Type: application/json
+
+{
+  "code": "invalid-or-expired-line-code",
+  "state": "optional-state"
+}
+
+### ❌ SECURITY — ลูกค้าแอปห้ามใช้ /users/me (ต้องได้ 400 ตามโค้ด)
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{customerToken}}
+
+### ✅ SUCCESS — โปรไฟล์พนักงาน (ต้องเป็น JWT แอดมิน ไม่ใช่ customer)
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{adminToken}}

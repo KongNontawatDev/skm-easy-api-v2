@@ -1,0 +1,15 @@
+###############################################################################
+# ใบเสร็จ — รายการจาก legacy SQL ตาม legacy customer id ใน JWT
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+@customerToken =
+
+### ✅ SUCCESS
+GET {{baseUrl}}/me/receipts
+Authorization: Bearer {{customerToken}}
+
+### ❌ FAIL — token หมดอายุ / ผิด
+GET {{baseUrl}}/me/receipts
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.invalid

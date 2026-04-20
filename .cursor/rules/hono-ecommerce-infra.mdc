@@ -1,0 +1,42 @@
+---
+description: อัปโหลด คิว ล็อก ความปลอดภัย idempotency สำหรับ Ecommerce API
+alwaysApply: true
+---
+
+# Infrastructure & Cross-Cutting Rules
+
+## File Upload (ไม่ใช้ upload middleware แบบ “magic”)
+
+- **ห้าม** พึ่ง middleware ที่ซ่อน lifecycle ของไฟล์จนควบคุม commit/rollback ไม่ได้
+- **ต้อง** มี flow ชัดเจน:
+  1. **รับสตรีม/บัฟเฟอร์** → เขียนลง **temp storage** (prefix + naming ที่คาดเดายาก, quota, mime/size check)
+  2. **Commit**: หลัง business validation สำเร็จ → ย้าย/ลงทะเบียนไฟล์ถาวร (object storage หรือ path จริง) + บันทึก metadata ใน DB
+  3. **Rollback**: เมื่อ transaction หรือขั้นตอนถัดไปล้มเหลว → ลบ temp และ state ที่เกี่ยวข้อง
+- การ optimize รูป (resize/compress) ทำใน **worker/queue** ไม่บล็อก request หลัก
+
+## Logging (Winston)
+
+- ใช้ **Winston** เป็น logger หลัก
+- บันทึกอย่างน้อย: **incoming request**, **outgoing response** (status, duration), **errors** (พร้อม correlation id), **audit logs** (การกระทำสำคัญของ admin/user ที่มีผลกับข้อมูล/เงิน)
+- รองรับ **toggle** เปิด/ปิดระดับ log หรือประเภท log ผ่าน environment (เช่น `LOG_LEVEL`, `AUDIT_LOG_ENABLED`)
+
+## Queue (BullMQ)
+
+- ใช้ **BullMQ** สำหรับ: email, notifications, webhooks ออกไปข้างนอก, heavy tasks
+- **ห้าม** บล็อก HTTP request ด้วยงานหนัก — enqueue แล้วตอบ client ด้วย state ที่ถูกต้อง (202 / accepted + tracking เมื่อเหมาะสม)
+
+## Security
+
+- **JWT** สำหรับ authentication session/API access ตามที่โปรเจกต์กำหนด
+- **RBAC**: ตรวจ permission ที่ controller หรือ middleware หลัง resolve user แต่ logic การตัดสินใจสิทธิ์ซับซ้อนอยู่ที่ service/policy
+- **Rate limiting** ที่ชั้น edge หรือ Hono middleware — ป้องกัน abuse และ brute force
+- ห้าม log token, OTP, หรือข้อมูลการชำระเงินแบบเต็ม
+
+## Idempotency
+
+- **บังคับ** สำหรับ **order creation** และ **payment** (และ endpoint ที่มีผลซ้ำอันตราย)
+- เก็บ **idempotency key** ฝั่ง client + บันทึกผลใน `idempotency_keys` (หรือเทียบเท่า) พร้อม TTL และ response ที่ cache ได้เมื่อ key ซ้ำ
+
+## Audit & Compliance mindset
+
+- การเปลี่ยนแปลงสถานะคำสั่งซื้อ การชำระเงิน การคืนเงิน ต้องมี audit trail ที่ query ได้

@@ -1,0 +1,71 @@
+###############################################################################
+# Support tickets — ลูกค้า: สร้าง/ดูของตัวเอง | แอดมิน: ดูทั้งหมด + ตอบ
+###############################################################################
+
+@host = http://127.0.0.1:3000
+@baseUrl = {{host}}/api/v1
+@customerToken =
+@adminToken =
+@supportTicketId =
+
+### ✅ SUCCESS — ลูกค้าสร้างตั๋ว
+# @name supportCreate
+POST {{baseUrl}}/me/support/tickets
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "title": "สอบถามงวดผ่อน",
+  "description": "ต้องการทราบยอดคงเหลือของสัญญา"
+}
+
+### ❌ FAIL — หัวข้อสั้นเกินไป (min 3)
+POST {{baseUrl}}/me/support/tickets
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "title": "AB",
+  "description": "ข้อความยาวพอ"
+}
+
+### ❌ FAIL — รายละเอียดสั้นเกินไป (min 5)
+POST {{baseUrl}}/me/support/tickets
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{
+  "title": "หัวข้อพอ",
+  "description": "สั้น"
+}
+
+### ✅ SUCCESS — ลูกค้าดูตั๋วของตัวเอง
+GET {{baseUrl}}/me/support/tickets
+Authorization: Bearer {{customerToken}}
+
+### ✅ SUCCESS — แอดมินดูตั๋วทั้งหมด
+GET {{baseUrl}}/admin/support/tickets
+Authorization: Bearer {{adminToken}}
+
+### ✅ SUCCESS — แอดมินตอบตั๋ว (สร้าง in-app notification ให้ลูกค้า)
+POST {{baseUrl}}/admin/support/tickets/{{supportTicketId}}/reply
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "adminReply": "รับเรื่องแล้ว จะติดต่อกลับภายใน 1 วันทำการ",
+  "status": "replied"
+}
+
+### ❌ FAIL — แอดมิน reply ว่าง
+POST {{baseUrl}}/admin/support/tickets/{{supportTicketId}}/reply
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "adminReply": ""
+}
+
+### ❌ SECURITY — ลูกค้าเรียก admin support
+GET {{baseUrl}}/admin/support/tickets
+Authorization: Bearer {{customerToken}}

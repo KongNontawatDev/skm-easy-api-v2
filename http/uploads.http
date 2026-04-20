@@ -1,0 +1,144 @@
+@host = http://127.0.0.1:3000
+@baseUrl = http://127.0.0.1:3000/api/v1
+@userToken =
+@uploadId =
+
+###############################################################################
+# Uploads — สตรีม multipart (public.router.ts)
+# ตัวแปร @baseUrl / @userToken ใช้ร่วมกับ http/variables.http (token ต้องเป็น staff ไม่ใช่ customer)
+# (ไม่มี list แบบ page/limit — ใช้ stream/commit/rollback ตาม flow ด้านล่าง)
+# POST /uploads/stream?fieldName=files&maxFiles=&maxFileMb=
+# POST /uploads/:id/commit
+# POST /uploads/:id/rollback
+#
+# ไฟล์ตัวอย่าง: http/fixtures/1x1.jpg (เส้นทางสัมพัทธ์จาก root ของ workspace — สอดคล้องกับ REST Client)
+###############################################################################
+
+### --- Stream upload: ความสำเร็จ — รูป JPEG ชนิดที่อนุญาต (jpeg/png/webp)
+# คาดหวัง: 201 + uploads[].id → นำ id ไปใส่ @uploadId แล้ว commit
+POST {{baseUrl}}/uploads/stream?fieldName=files&maxFiles=3&maxFileMb=15
+Authorization: Bearer {{userToken}}
+Content-Type: multipart/form-data; boundary=----httpSuiteBoundary
+
+------httpSuiteBoundary
+Content-Disposition: form-data; name="files"; filename="1x1.jpg"
+Content-Type: image/jpeg
+
+< http/fixtures/1x1.jpg
+------httpSuiteBoundary--
+
+### --- Stream upload: ความสำเร็จ — หลายไฟล์ (สูงสุดตาม maxFiles)
+POST {{baseUrl}}/uploads/stream?fieldName=files&maxFiles=2&maxFileMb=15
+Authorization: Bearer {{userToken}}
+Content-Type: multipart/form-data; boundary=----httpSuiteBoundary2
+
+------httpSuiteBoundary2
+Content-Disposition: form-data; name="files"; filename="a.jpg"
+Content-Type: image/jpeg
+
+< http/fixtures/1x1.jpg
+------httpSuiteBoundary2
+Content-Disposition: form-data; name="files"; filename="b.jpg"
+Content-Type: image/jpeg
+
+< http/fixtures/1x1.jpg
+------httpSuiteBoundary2--
+
+### --- Stream upload: ความล้มเหลว — ไม่มี Authorization
+POST {{baseUrl}}/uploads/stream?fieldName=files&maxFiles=1&maxFileMb=5
+Content-Type: multipart/form-data; boundary=----httpSuiteBoundary3
+
+------httpSuiteBoundary3
+Content-Disposition: form-data; name="files"; filename="1x1.jpg"
+Content-Type: image/jpeg
+
+< http/fixtures/1x1.jpg
+------httpSuiteBoundary3--
+
+### --- Stream upload: ความล้มเหลว — ชนิดไฟล์ไม่รองรับ (เช่น text/plain)
+# คาดหวัง: 400 จาก mime ไม่อยู่ใน allowlist
+POST {{baseUrl}}/uploads/stream?fieldName=files&maxFiles=1&maxFileMb=5
+Authorization: Bearer {{userToken}}
+Content-Type: multipart/form-data; boundary=----httpSuiteBoundary4
+
+------httpSuiteBoundary4
+Content-Disposition: form-data; name="files"; filename="note.txt"
+Content-Type: text/plain
+
+hello-not-an-image
+------httpSuiteBoundary4--
+
+### --- Stream upload: ความล้มเหลว — field name ไม่ตรงกับ query fieldName=files
+# ส่ง name="wrong" แทน "files" → busboy จะไม่รับไฟล์ → 400 "ไม่พบไฟล์ที่อัปโหลด"
+POST {{baseUrl}}/uploads/stream?fieldName=files&maxFiles=1&maxFileMb=5
+Authorization: Bearer {{userToken}}
+Content-Type: multipart/form-data; boundary=----httpSuiteBoundary5
+
+------httpSuiteBoundary5
+Content-Disposition: form-data; name="wrong"; filename="1x1.jpg"
+Content-Type: image/jpeg
+
+< http/fixtures/1x1.jpg
+------httpSuiteBoundary5--
+
+### --- Stream upload: ความล้มเหลว — query maxFiles เกิน 10 (Zod)
+POST {{baseUrl}}/uploads/stream?fieldName=files&maxFiles=99&maxFileMb=5
+Authorization: Bearer {{userToken}}
+Content-Type: multipart/form-data; boundary=----httpSuiteBoundary6
+
+------httpSuiteBoundary6
+Content-Disposition: form-data; name="files"; filename="1x1.jpg"
+Content-Type: image/jpeg
+
+< http/fixtures/1x1.jpg
+------httpSuiteBoundary6--
+
+### --- Stream upload: ความล้มเหลว — maxFileMb เกิน 40 (Zod)
+POST {{baseUrl}}/uploads/stream?fieldName=files&maxFiles=1&maxFileMb=100
+Authorization: Bearer {{userToken}}
+Content-Type: multipart/form-data; boundary=----httpSuiteBoundary7
+
+------httpSuiteBoundary7
+Content-Disposition: form-data; name="files"; filename="1x1.jpg"
+Content-Type: image/jpeg
+
+< http/fixtures/1x1.jpg
+------httpSuiteBoundary7--
+
+### --- Stream upload: edge — ไฟล์ใหญ่เกิน maxFileMb (ตั้ง maxFileMb=1 แล้วแนบไฟล์ > 1MB)
+# สร้างไฟล์ใหญ่ชั่วคราวแล้วชี้ path แทน ./http/fixtures/1x1.jpg
+# ตัวอย่าง bash: dd if=/dev/zero of=http/fixtures/big.bin bs=1048576 count=2
+# จากนั้นใส่ Content-Type: image/jpeg จะยังถูกปฏิเสธเมื่ออ่านจริงหรือตามขนาด — ปรับตามพฤติกรรม busboy ของ Node
+POST {{baseUrl}}/uploads/stream?fieldName=files&maxFiles=1&maxFileMb=1
+Authorization: Bearer {{userToken}}
+Content-Type: multipart/form-data; boundary=----httpSuiteBoundary8
+
+------httpSuiteBoundary8
+Content-Disposition: form-data; name="files"; filename="huge.jpg"
+Content-Type: image/jpeg
+
+< http/fixtures/1x1.jpg
+------httpSuiteBoundary8--
+
+###############################################################################
+# Commit / Rollback
+###############################################################################
+
+### --- Commit: ความสำเร็จ — ย้ายจาก TEMP → ถาวร (ต้องใช้ uploadId จาก stream ล่าสุด)
+POST {{baseUrl}}/uploads/{{uploadId}}/commit
+Authorization: Bearer {{userToken}}
+
+### --- Commit: ความล้มเหลว — id ไม่มีในระบบ (จำลองความล้มเหลว DB / ไม่พบเรคคอร์ด)
+POST {{baseUrl}}/uploads/0000000001/commit
+Authorization: Bearer {{userToken}}
+
+### --- Commit: ความล้มเหลว — ไม่มี token
+POST {{baseUrl}}/uploads/{{uploadId}}/commit
+
+### --- Rollback: ความสำเร็จ — ยกเลิกไฟล์ TEMP (ใช้หลังอัปโหลดแต่ยังไม่ commit)
+POST {{baseUrl}}/uploads/{{uploadId}}/rollback
+Authorization: Bearer {{userToken}}
+
+### --- Rollback: id ไม่มี — คืน rolledBack: true แบบ no-op ตาม service
+POST {{baseUrl}}/uploads/0000000001/rollback
+Authorization: Bearer {{userToken}}

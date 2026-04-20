@@ -1,0 +1,59 @@
+---
+description: พฤติกรรม AI + มาตรฐานโค้ดระดับโปรดักชัน สำหรับ Hono + TS + Prisma Ecommerce API
+alwaysApply: true
+---
+
+# Hono Ecommerce Backend — Core Standards
+
+## พฤติกรรมทั่วไป
+
+- เขียนโค้ดระดับ **production** เท่านั้น ห้ามสร้างโค้ดสาธิต mock/demo ที่ bypass validation, auth, หรือ persistence
+- **ห้ามข้าม** validation, structured logging, และ error handling ที่สอดคล้องกับ centralized handler
+- ปฏิบัติตามโครงสร้างโฟลเดอร์ของโปรเจกต์อย่างเคร่งครัด ไม่สร้างไฟล์นอกแพตเทิร์นที่กำหนดใน `PROJECT_SPEC.md`
+- ชอบความชัดเจนมากกว่าเทคนิคซับซ้อนโดยไม่จำเป็น
+
+## สถาปัตยกรรม (Feature-based + Layered)
+
+ลำดับการเรียก: **Route → Controller → Service → Repository → DB**
+
+- **Route (Hono)**: ผูก HTTP, middleware บางส่วน (เช่น auth), เรียก controller เท่านั้น — **ห้าม** ใส่ business logic
+- **Controller**: รับ request context, parse/validate ผ่าน schema ที่กำหนด, เรียก service, map เป็น HTTP response — **ห้าม** เข้าถึง Prisma/DB โดยตรง
+- **Service**: business rules, orchestration, transaction boundaries (เมื่อจำเป็น)
+- **Repository**: การเข้าถึงข้อมูลผ่าน Prisma, query ที่ซับซ้อน, soft delete policy
+
+### ข้อจำกัดการ import ระหว่าง feature
+
+- **ห้าม** cross-import **services** ระหว่าง feature โดยตรง
+- **อนุญาต** cross-feature ผ่าน **repository** (หรือ abstraction ที่ชัดเจนเป็น data-access เท่านั้น) เมื่อจำเป็นต้องอ่าน/เขียนข้อมูลข้ามโดเมน — ระบุเหตุผลใน service layer ของ feature ที่เป็นเจ้าของ use case
+
+## TypeScript & สไตล์โค้ด
+
+- `strict` mode, `async/await`, **หลีกเลี่ยง `any`** — ใช้ `unknown` + narrowing หรือ type ที่ชัดจาก Zod inferred types
+- ตั้งชื่อไฟล์ชัดเจน เช่น `user.service.ts`, `order.repo.ts`, `product.controller.ts`
+
+## Validation (Zod)
+
+- ใช้ **Zod** สำหรับ input ทุกชนิด: JSON body, query params, path params, headers ที่จำเป็น (เช่น idempotency), และ metadata ของไฟล์อัปโหลด
+- reject input ที่ไม่ถูกต้องทันทีด้วย response มาตรฐาน (ไม่ leak รายละเอียดภายใน)
+
+## Error Handling
+
+- ใช้ **centralized error handler** ของ Hono (หรือ middleware สุดท้าย)
+- **ห้าม** ส่ง stack trace หรือข้อความ DB/ระบบภายนอกให้ client
+- response error เป็น **โครงสร้างเดียวกันทั้งระบบ** (code, message ที่ปลอดภัย, optional field ที่ไม่ sensitive)
+
+## Database (Prisma)
+
+- เข้าถึง DB ผ่าน repository เท่านั้น (ยกเว้น migration/seed ที่แยกชัด)
+- ใช้ **soft delete** ตามที่โมเดลกำหนด (users, products ฯลฯ)
+- เพิ่ม **indexes** ตาม access pattern และรายงานใน migration
+- ใช้ **transaction** เมื่อมีหลาย write ที่ต้อง atomic (เช่น order + inventory + payment state)
+
+## OpenAPI
+
+- ใช้ **`@hono/zod-openapi`** — ทุก route ต้องมี schema (request/response) ที่ sync กับ Zod
+
+## การทดสอบและความสมบูรณ์
+
+- โค้ดที่สร้างต้อง **รันได้** compile ผ่าน และไม่ทิ้ง implementation ครึ่งทาง
+- **ห้าม** ทิ้ง `TODO` / placeholder ที่ทำให้ behavior ไม่ครบใน production path
