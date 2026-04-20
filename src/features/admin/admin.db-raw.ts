@@ -1,5 +1,5 @@
 /**
- * คำสั่งฐานข้อมูลแอดมิน — Prisma `$queryRaw` / `$executeRaw` เท่านั้น
+ * คำสั่งฐานข้อมูลแอดมิน — raw SQL ผ่าน mysql2
  */
 import { prisma } from '../../core/db/client.js';
 import { newDbId } from '../../core/db/new-id.js';

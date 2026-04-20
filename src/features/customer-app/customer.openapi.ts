@@ -10,12 +10,11 @@ import {
   resolveLegacyCustomerIdForCustomerSession,
 } from '../customer-auth/customer-auth.service.js';
 import {
-  bumpCustomerLegacyCache,
   getContractDetailForCustomer,
-  listContractsForCustomerCached,
-  listInstallmentsForCustomerCached,
-  listReceiptsForCustomerCached,
-} from './customer-legacy-cached.service.js';
+  listContractsForCustomerApi,
+  listInstallmentsForCustomerApi,
+  listReceiptsForCustomerApi,
+} from './customer-legacy.service.js';
 import { findCustomerByPhone, linkLineProfile } from '../legacy-sql/legacy-sql.service.js';
 import {
   bootstrapByLineUserId,
@@ -198,7 +197,7 @@ export function registerCustomerPrivateRoutes(api: OpenAPIHono) {
   api.openapi(contracts, async (c) => {
     const auth = c.get('auth')!;
     const legacyCustomerId = await resolveLegacyCustomerIdForCustomerSession(auth);
-    const rows = await listContractsForCustomerCached(legacyCustomerId);
+    const rows = await listContractsForCustomerApi(legacyCustomerId);
     return jsonSuccess(c, rows, { message: 'รายการสัญญา' });
   });
 
@@ -228,7 +227,7 @@ export function registerCustomerPrivateRoutes(api: OpenAPIHono) {
     const auth = c.get('auth')!;
     const { contractRef } = c.req.valid('param');
     const legacyCustomerId = await resolveLegacyCustomerIdForCustomerSession(auth);
-    const rows = await listInstallmentsForCustomerCached(legacyCustomerId, contractRef);
+    const rows = await listInstallmentsForCustomerApi(legacyCustomerId, contractRef);
     return jsonSuccess(c, rows, { message: 'รายการงวด' });
   });
 
@@ -241,7 +240,7 @@ export function registerCustomerPrivateRoutes(api: OpenAPIHono) {
   api.openapi(receipts, async (c) => {
     const auth = c.get('auth')!;
     const legacyCustomerId = await resolveLegacyCustomerIdForCustomerSession(auth);
-    const rows = await listReceiptsForCustomerCached(legacyCustomerId);
+    const rows = await listReceiptsForCustomerApi(legacyCustomerId);
     return jsonSuccess(c, rows, { message: 'ใบเสร็จ' });
   });
 
@@ -281,7 +280,6 @@ export function registerCustomerPrivateRoutes(api: OpenAPIHono) {
     if (Object.keys(linkData).length > 0) {
       await patchCustomerLiffLinkProfile(auth.id, body.lineUserId, linkData);
     }
-    await bumpCustomerLegacyCache(auth.id);
     return jsonSuccess(c, { linked: true }, { message: 'ผูก LINE สำเร็จ' });
   });
 
@@ -305,7 +303,6 @@ export function registerCustomerPrivateRoutes(api: OpenAPIHono) {
     const body = c.req.valid('json');
     const lineUserId = await resolveLineUserIdFromBootstrapBody(body);
     await unlinkLineForCustomer(auth.id, lineUserId);
-    await bumpCustomerLegacyCache(auth.id);
     return jsonSuccess(c, { ok: true }, { message: 'ยกเลิกการเชื่อมต่อ LINE แล้ว' });
   });
 }

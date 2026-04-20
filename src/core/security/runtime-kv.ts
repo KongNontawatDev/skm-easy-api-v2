@@ -1,8 +1,6 @@
 /**
- * 📌 อธิบายไฟล์นี้:
- * - ไฟล์นี้ทำหน้าที่อะไร: เก็บ state ชั่วคราวใน memory ของโปรเซส (rate limit, dedupe, นับ OTP) แทน Redis
- * - ใช้ในส่วนไหนของระบบ: `rate-limit.middleware.ts`, dedupe webhook, OTP rate limit
- * - ข้อจำกัด: ไม่แชร์ระหว่างหลาย instance — เหมาะกับ deploy โหนดเดียวหรือ dev
+ * เก็บ state ชั่วคราวใน memory ของโปรเซส (rate limit, dedupe, นับ OTP)
+ * ไม่แชร์ระหว่างหลาย instance — เหมาะกับ deploy โหนดเดียวหรือ dev
  */
 type CounterEntry = { kind: 'c'; count: number; expiresAt: number };
 type StringEntry = { kind: 's'; value: string; expiresAt: number };
@@ -23,10 +21,8 @@ function getEntry(key: string): CounterEntry | StringEntry | undefined {
   return e;
 }
 
-/**
- * API ย่อยแบบเดียวกับที่โค้ดเคยเรียกผ่าน ioredis — ไม่ต้องเชื่อมต่อภายนอก
- */
-export const redis = {
+/** API แบบ key-value ในแรม (เคยเรียกว่า redis ในโปรเจกต์นี้) */
+export const runtimeKv = {
   async connect(): Promise<void> {
     /* no-op */
   },
@@ -42,9 +38,6 @@ export const redis = {
     return String(e.count);
   },
 
-  /**
-   * รองรับ `SET key val EX sec` และ `SET key val EX sec NX`
-   */
   async set(key: string, value: string, ...args: unknown[]): Promise<'OK' | null> {
     const ttlSec = args[0] === 'EX' && typeof args[1] === 'number' ? (args[1] as number) : null;
     const nx = args[2] === 'NX';

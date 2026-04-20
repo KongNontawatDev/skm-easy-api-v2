@@ -4,6 +4,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { randomUUID } from 'node:crypto';
+import { HTTP_LOG_ENABLED } from './core/constants.js';
 import { env } from './core/env/config.js';
 import { logger } from './core/logger/logger.js';
 import { isAppError } from './core/http/errors.js';
@@ -36,7 +37,7 @@ export function createApp() {
     const started = performance.now();
     await next();
     const ms = performance.now() - started;
-    if (env.HTTP_LOG_ENABLED) {
+    if (HTTP_LOG_ENABLED) {
       logger.info('http', {
         requestId,
         method: c.req.method,

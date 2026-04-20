@@ -6,7 +6,7 @@ import { mkdir, readdir, rename, rmdir, unlink, stat } from 'node:fs/promises';
 import { dirname, join, resolve, normalize, sep } from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { env } from '../../core/env/config.js';
+import { MAX_UPLOAD_IMAGE_BYTES, UPLOAD_ROOT } from '../../core/constants.js';
 
 /** URL ที่เก็บใน DB (path สัมพัทธ์ — ต่อกับ origin ของ API) */
 export const CMS_FILES_URL_PREFIX = '/api/v1/public/files/';
@@ -20,7 +20,7 @@ const MIME_EXT: Record<string, string> = {
 };
 
 export function uploadRootAbs(): string {
-  return resolve(process.cwd(), env.UPLOAD_ROOT);
+  return resolve(process.cwd(), UPLOAD_ROOT);
 }
 
 export function publicUrlForCmsFile(relativeUnderCms: string): string {
@@ -130,7 +130,7 @@ export async function saveCmsImageFromWebStream(params: {
   const relativePath = `${subdir}/${params.entityId}${ext}`;
   const absolutePath = safeResolveUnderUpload(relativePath);
   const nodeReadable = Readable.fromWeb(params.webReadable as import('stream/web').ReadableStream);
-  await streamFileToDisk(nodeReadable, absolutePath, env.MAX_UPLOAD_IMAGE_BYTES);
+  await streamFileToDisk(nodeReadable, absolutePath, MAX_UPLOAD_IMAGE_BYTES);
   return {
     relativePath,
     publicUrl: publicUrlForCmsFile(relativePath),
@@ -191,7 +191,7 @@ export async function saveSupportTicketSingleImageFromWebStream(params: {
   const relativePath = `support-tickets/${params.ticketId}${ext}`;
   const absolutePath = safeResolveUnderUpload(relativePath);
   const nodeReadable = Readable.fromWeb(params.webReadable as import('stream/web').ReadableStream);
-  await streamFileToDisk(nodeReadable, absolutePath, env.MAX_UPLOAD_IMAGE_BYTES);
+  await streamFileToDisk(nodeReadable, absolutePath, MAX_UPLOAD_IMAGE_BYTES);
   return {
     relativePath,
     publicUrl: publicUrlForCmsFile(relativePath),

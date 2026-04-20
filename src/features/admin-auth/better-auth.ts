@@ -4,7 +4,7 @@
  * เอกสารอ้างอิง:
  * - [Basic usage](https://www.better-auth.com/docs/basic-usage)
  * - [Email & password](https://better-auth.com/docs/authentication/email-password)
- * - Adapter ฐานข้อมูลแบบ raw SQL (`adminMysqlRawAdapter`) แทน `better-auth/adapters/prisma`
+ * - Adapter ฐานข้อมูลแบบ raw SQL (`adminMysqlRawAdapter` + mysql2)
  * - [Hono](https://www.better-auth.com/docs/integrations/hono) — mount handler + CORS + `credentials`
  */
 import { betterAuth } from 'better-auth';
@@ -40,7 +40,7 @@ export const adminAuth = betterAuth({
   database: adminMysqlRawAdapter(prisma),
   emailAndPassword: {
     enabled: true,
-    /** สร้างแอดมินผ่าน `prisma db seed` / DBA — ไม่เปิด public sign-up */
+    /** สร้างแอดมินผ่าน `npx tsx scripts/seed-admin.ts` / DBA — ไม่เปิด public sign-up */
     disableSignUp: true,
     sendResetPassword: async ({ user, url }) => {
       try {

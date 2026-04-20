@@ -1,0 +1,5 @@
+-- พารามิเตอร์: ? = contractRef (BRANID:CONTNO)
+SELECT CAST(IFNULL(d.INSTPERIOD, 0) AS CHAR) AS installmentRef, d.INSTPERIOD AS periodNo, DATE_FORMAT(d.INSTDUEDTE, '%Y-%m-%d') AS dueDate, IFNULL(d.AMOUNT, 0) AS amount, IFNULL(d.TRANRCDSTS, '') AS paidStatus
+FROM hpreceipt_detail d
+WHERE CONCAT(d.BRANID, ':', d.CONTNO) = ? AND d.INSTPERIOD IS NOT NULL
+ORDER BY d.INSTPERIOD, d.UNIQUEREC

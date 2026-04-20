@@ -1,7 +1,7 @@
 /**
  * 📌 ไฟล์นี้ทำหน้าที่อะไร
  * - ลงทะเบียน route OpenAPI สำหรับโปรโมชัน / บทความ / คู่มือ (อ่านสาธารณะ)
- * - delegate ไป `cmsPublic.service` เพื่อแคช Redis + ลดโหลด DB
+ * - delegate ไป `cmsPublic.service` อ่านจาก DB
  */
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi';
 import { jsonSuccess, openapiJsonSuccess, openapiStandardErrors } from '../../core/http/api-response.js';

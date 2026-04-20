@@ -9,6 +9,7 @@
  * - Refresh token: อายุยาว มี claim `typ: 'refresh'` — ใช้แลก access ใหม่ได้เมื่อ access หมดอายุ
  */
 import jwt from 'jsonwebtoken';
+import { JWT_ACCESS_TTL_SEC, JWT_REFRESH_TTL_SEC } from '../constants.js';
 import { env } from '../env/config.js';
 import type { AuthPrincipal } from '../http/request-context.js';
 
@@ -26,7 +27,7 @@ export type AccessTokenPayload = {
  * - ทำงานยังไง: สร้าง payload แล้ว `jwt.sign` ด้วย HS256 และ secret ของ access
  * - return อะไร: สตริง JWT
  */
-export function signAccessToken(principal: AuthPrincipal, ttlSec = env.JWT_ACCESS_TTL_SEC) {
+export function signAccessToken(principal: AuthPrincipal, ttlSec = JWT_ACCESS_TTL_SEC) {
   const payload: AccessTokenPayload = {
     sub: principal.id,
     email: principal.email,
@@ -43,7 +44,7 @@ export function signAccessToken(principal: AuthPrincipal, ttlSec = env.JWT_ACCES
  * - ทำงานยังไง: sign ด้วย secret คนละตัวกับ access และใส่ `typ: 'refresh'` เพื่อกันนำไปใช้แทน access
  * - return อะไร: สตริง JWT refresh
  */
-export function signRefreshToken(userId: string, ttlSec = env.JWT_REFRESH_TTL_SEC) {
+export function signRefreshToken(userId: string, ttlSec = JWT_REFRESH_TTL_SEC) {
   return jwt.sign({ sub: userId, typ: 'refresh' }, env.JWT_REFRESH_SECRET, {
     algorithm: 'HS256',
     expiresIn: ttlSec,

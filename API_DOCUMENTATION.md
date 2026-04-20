@@ -1,13 +1,37 @@
 # API Documentation — SKM Easy Installment Platform
 
-Base path: `/api/v1`  
-Response มาตรฐาน: `{ success, data, message, meta }`
+เอกสาร endpoint ฝั่ง **Hono** — base path **`/api/v1`**  
+รูปแบบตอบกลับมาตรฐาน: `{ success, data, message, meta }`
 
-**หมายเหตุล่าสุด**
+---
 
-- `GET /public/promotions`, `/public/articles`, `/public/guides` ใช้ **Redis แคช** (TTL ตาม env `CACHE_PUBLIC_*`) — หลังแอดมินสร้างโปรโมชันระบบจะ invalidate แคชโปรโมชัน
-- `GET /me/contracts*` และ `/me/receipts` แคชผล legacy SQL ต่อลูกค้า — invalidate เมื่อผูก LINE หรือหลัง `POST /integrations/installment-notify` (แจ้งเตือน)
-- **LINE / legacy:** ดึง `line_user_id` สำหรับแจ้งเตือนใช้ `LEGACY_GET_LINE_USER_BY_CUSTOMER_SQL` (แนะนำชี้ไปตาราง `customer_liff_links`) — `LEGACY_LINE_LINK_UPDATE_SQL` ว่างได้ (โค้ดอัปเดตโปรไฟล์ที่ `customer_liff_links` แล้ว) ดู `DEVELOPMENT_RULES.md`
+## สรุปการเปลี่ยนแปลงล่าสุด (อ่านก่อน integrate)
+
+| หัวข้อ | รายละเอียด |
+|--------|-------------|
+| **Legacy SQL** | ไม่เก็บ statement ใน `.env` — ใส่เป็นไฟล์ `.sql` ใน `config/legacy-sql/` (หรือโฟลเดอร์ที่ `LEGACY_SQL_DIR` ชี้) ดู mapping ชื่อไฟล์ด้านล่าง |
+| **ฐานข้อมูลแอป** | เชื่อมต่อด้วย **`mysql2`** pool — โค้ดเรียกผ่าน shim `prisma.$queryRawUnsafe` / `$executeRawUnsafe` ใน `src/core/db/client.ts` (ไม่มี Prisma ORM / migrate ใน repo นี้) |
+| **แคช / rate limit** | ใช้ **`runtimeKv`** (in-memory ในโปรเซสเดียวกับ API) — **ไม่**พึ่ง Redis สำหรับ public CMS; OTP / rate limit / dedupe ใช้คีย์ใน memory (รีสตาร์ทแล้วหาย) |
+| **ค่าที่ย้ายออกจาก env** | JWT TTL, HTTP/audit log, rate limit, OTP tuning, ขนาดอัปโหลด, ชื่อแบรนด์ Flex ฯลฯ อยู่ที่ **`src/core/constants.ts`** |
+
+---
+
+## Legacy SQL ↔ ชื่อไฟล์ (`LEGACY_SQL_DIR`, default `config/legacy-sql`)
+
+| ความหมายเดิม (ชื่อ env เก่า) | ไฟล์ที่ใช้แทน |
+|------------------------------|----------------|
+| ลูกค้าตามเบอร์ | `acc-cus-by-phone.sql` |
+| รายการสัญญา | `contracts-by-customer.sql` |
+| รายละเอียดสัญญา | `contract-detail.sql` |
+| งวดผ่อน | `installments-by-contract.sql` |
+| ใบเสร็จ | `receipts-by-customer.sql` |
+| LINE user สำหรับ Push | `line-user-by-customer.sql` (แนะนำ `SELECT … FROM customer_liff_links WHERE legacy_customer_id = ?`) |
+| อัปเดตลิงก์ LINE (legacy) | `line-link-update.sql` — **ออปชัน** ว่างได้ (โค้ดอัปเดต `customer_liff_links` เป็นหลัก) |
+| ทำเครื่องหมายงวดจ่าย (เครื่องมือภายนอก) | `mark-installment-paid.sql` — ออปชัน |
+
+รายละเอียดการเขียน SQL และพารามิเตอร์ `?` ดู **`DEVELOPMENT_RULES.md`**
+
+---
 
 ## Auth ลูกค้าแอป (เบอร์โทร)
 
@@ -16,38 +40,50 @@ Response มาตรฐาน: `{ success, data, message, meta }`
 | POST | `/auth/customer/otp/request` | body `{ phone }` → ส่ง SMS OTP |
 | POST | `/auth/customer/otp/verify` | body `{ phone, refCode, otpCode }` — `otpCode` ตัวเลข **4 หลัก** → `accessToken` |
 
+---
+
 ## ลูกค้า (ต้อง `Authorization: Bearer` + role customer)
 
 | Method | Path | คำอธิบาย |
 |--------|------|-----------|
-| GET | `/me/profile` | ข้อมูลจาก `LEGACY_ACC_CUS_BY_PHONE_SQL` |
-| GET | `/me/contracts` | รายการสัญญา — `LEGACY_CONTRACTS_BY_CUSTOMER_SQL` |
-| GET | `/me/contracts/{contractRef}` | รายละเอียด — `LEGACY_CONTRACT_DETAIL_SQL` |
-| GET | `/me/contracts/{contractRef}/installments` | งวด — `LEGACY_INSTALLMENTS_BY_CONTRACT_SQL` |
-| GET | `/me/receipts` | ใบเสร็จ — `LEGACY_RECEIPTS_BY_CUSTOMER_SQL` |
-| POST | `/me/line/link` | ผูก LINE — อัปเดต `customer_liff_links` ในโค้ด; `LEGACY_LINE_LINK_UPDATE_SQL` เป็นออปชัน (ว่างได้) |
+| GET | `/me/profile` | ข้อมูลจาก `acc-cus-by-phone.sql` |
+| GET | `/me/contracts` | รายการสัญญา — `contracts-by-customer.sql` |
+| GET | `/me/contracts/{contractRef}` | รายละเอียด — `contract-detail.sql` |
+| GET | `/me/contracts/{contractRef}/installments` | งวด — `installments-by-contract.sql` |
+| GET | `/me/receipts` | ใบเสร็จ — `receipts-by-customer.sql` |
+| POST | `/me/line/link` | ผูก LINE — อัปเดต `customer_liff_links` ในโค้ด; `line-link-update.sql` เป็นออปชัน |
 | POST | `/me/payments/qr` | body `{ amountBaht }` → PromptPay payload |
 | GET | `/me/support/tickets` | ตั๋วของลูกค้า |
 | POST | `/me/support/tickets` | สร้างตั๋ว |
 
-## แจ้งเตือน (JWT เดียวกัน — กรองด้วย `idno` = รหัสลูกค้า legacy เช่น `COMPID:IDNO` ตาม JWT `sub` ต้องตรงกับค่าที่บันทึกในแถว `notifications`)
+---
+
+## แจ้งเตือน in-app (JWT เดียวกัน)
+
+กรองด้วย `idno` = รหัสลูกค้า legacy ให้ตรงกับ JWT `sub` (เช่น `COMPID:IDNO`)
 
 | Method | Path |
 |--------|------|
 | GET | `/notifications` |
 | PATCH | `/notifications/{id}/read` |
 
-## ระบบตัดงวด → แจ้งเตือน (ไม่ใช้ JWT — secret แยกจาก webhook)
+---
+
+## ระบบตัดงวด → แจ้งเตือน (ไม่ใช้ JWT ของลูกค้า)
 
 | Method | Path | คำอธิบาย |
 |--------|------|-----------|
-| POST | `/integrations/installment-notify` | `Authorization: Bearer <INSTALLMENT_INTEGRATION_SECRET>` หรือ `X-Installment-Integration-Secret` — body: `cusId` / `legacyCustomerId`, `status`, ฟิลด์ Flex (`lineFlexKind`, `dueDate`, `amountBaht`, …), `requestId?` กันซ้ำ |
+| POST | `/integrations/installment-notify` | แนะนำ header **`X-Api-Key: <INSTALLMENT_POSTING_API_KEY>`** — รองรับ **`Authorization: Bearer <INSTALLMENT_INTEGRATION_SECRET>`** (legacy) — body: `cusId` / `legacyCustomerId`, `status`, ฟิลด์ Flex, `requestId?` กันซ้ำ |
+
+---
 
 ## Webhook เข้า (ไม่ใช้ JWT — ใช้ HMAC)
 
 | Method | Path | คำอธิบาย |
 |--------|------|-----------|
-| POST | `/webhooks/inbound` | Header `X-Webhook-Signature: sha256=<hex>` คู่กับ `WEBHOOK_SIGNING_SECRET` — เหตุการณ์ทั่วไป (ไม่ใช่ช่องแจ้งเตือนหลังตัดงวด) |
+| POST | `/webhooks/inbound` | Header `X-Webhook-Signature: sha256=<hex>` คู่กับ `WEBHOOK_SIGNING_SECRET` |
+
+---
 
 ## สาธารณะ (ไม่ต้อง JWT)
 
@@ -58,24 +94,32 @@ Response มาตรฐาน: `{ success, data, message, meta }`
 | GET | `/public/guides` |
 | GET | `/public/runtime-config` |
 
-## Auth ผู้ใช้ระบบเดิม (ตาราง `User` ใน MariaDB — เข้าถึงด้วย Prisma raw; ไม่รวมแอดมิน Better Auth)
+อ่านข้อมูล CMS จาก MariaDB โดยตรง (ไม่มี Redis แคชในรุ่นปัจจุบัน)
+
+---
+
+## Auth ผู้ใช้ระบบเดิม (ตาราง `User` ใน MariaDB — raw SQL เท่านั้น)
 
 | Method | Path | หมายเหตุ |
 |--------|------|-----------|
 | POST | `/auth/login` | email + password — **บัญชี `isStaff` ห้ามใช้เส้นนี้** (ใช้ Better Auth แทน) |
-| POST | `/auth/otp/request` + `/auth/otp/verify` | OTP อีเมล — รหัส **4 หลัก** (`verify`: `code` ตัวเลข 4 หลัก) |
+| POST | `/auth/otp/request` + `/auth/otp/verify` | OTP อีเมล — รหัส **4 หลัก** |
 | GET | `/users/me` | ไม่รองรับ role `customer` |
+
+---
 
 ## Better Auth — แอดมิน back-office
 
 | รายการ | ค่า |
 |--------|-----|
-| Base path | `/api/v1/admin-auth` (mount ทั้งหมดของ Better Auth) |
+| Base path | `/api/v1/admin-auth` |
 | ตาราง DB | `admin_auth_user`, `admin_auth_session`, `admin_auth_account`, `admin_auth_verification` |
-| Env ฝั่ง API | `BETTER_AUTH_URL` = origin ของ API (production บังคับ — dev ถ้าไม่ตั้งจะใช้ `http://127.0.0.1:<PORT>`), `BETTER_AUTH_SECRET` (ไม่ตั้งได้ใช้ `JWT_ACCESS_SECRET`) |
-| ทดสอบ CLI | `npm run test:admin-auth` — ต้องมี DB + ตาราง `admin_auth_*` และ seed แอดมิน |
+| Env ฝั่ง API | `BETTER_AUTH_URL` = origin ของ API (production บังคับ), `BETTER_AUTH_SECRET` (ไม่ตั้งใช้ `JWT_ACCESS_SECRET`) |
+| ทดสอบ CLI | `npm run test:admin-auth` — ต้องมี DB + ตาราง `admin_auth_*` และ seed แอดมิน (`npm run seed:admin`) |
 
-เว็บแอดมินเรียก `signIn.email` / `getSession` ผ่าน `better-auth/client` ที่ base URL ข้างบน พร้อม `credentials: 'include'` และ `CORS_ORIGINS` ต้องรวม origin ของแอดมิน
+เว็บแอดมินเรียก Better Auth client ที่ base URL ข้างบน พร้อม `credentials: 'include'` และ `CORS_ORIGINS` / `ADMIN_APP_ORIGINS` ต้องรวม origin ของแอดมิน
+
+---
 
 ## Admin (`/api/v1/admin` + cookie session จาก Better Auth)
 
@@ -86,7 +130,14 @@ Response มาตรฐาน: `{ success, data, message, meta }`
 | POST | `/admin/promotions` |
 | GET | `/admin/support/tickets` |
 | POST | `/admin/support/tickets/{id}/reply` | body `{ adminReply, status? }` |
-| GET | `/admin/tools/line-oa/templates` | รายการเทมเพลตทดสอบส่ง LINE (ข้อความ / Flex) — สำหรับแอดมิน |
-| POST | `/admin/tools/line-oa/test-push` | body `{ legacyCustomerId, template }` — ยิง Push LINE OA จริงตาม `LINE_CHANNEL_ACCESS_TOKEN`; ต้องมีแถว `customer_liff_links` สำหรับลูกค้านั้น |
+| GET | `/admin/tools/line-oa/templates` | เทมเพลตทดสอบส่ง LINE |
+| POST | `/admin/tools/line-oa/test-push` | body `{ legacyCustomerId, template }` — ต้องมีแถว `customer_liff_links` |
 
-บัญชีแอดมินตัวอย่างดู `prisma/seed.ts`
+---
+
+## อ้างอิงเพิ่มเติม
+
+- **`DEVELOPMENT_RULES.md`** — legacy, SMS, migration SQL, แอดมิน
+- **`DATABASE_DOCUMENTATION.md`** — ตารางและความสัมพันธ์
+- **`src/core/env/config.ts`** — รายการ env ที่ validate ด้วย Zod
+- **`src/core/constants.ts`** — ค่าคงที่ runtime ที่ไม่ผ่าน env

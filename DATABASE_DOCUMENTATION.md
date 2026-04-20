@@ -1,6 +1,6 @@
 # เอกสารฐานข้อมูล — SKM Easy API v2
 
-เอกสารนี้อธิบายตารางที่ใช้งานจริงในแพลตฟอร์ม (Prisma schema + migration) และความสัมพันธ์กับ MariaDB legacy
+เอกสารนี้อธิบายตารางที่ระบบใช้งานจริง ความสัมพันธ์กับ **MariaDB legacy** และวิธีเข้าถึงข้อมูลผ่าน **`mysql2`** (raw SQL เท่านั้น)
 
 ---
 
@@ -8,15 +8,23 @@
 
 | กลุ่ม | คำอธิบาย |
 |--------|-----------|
-| **Legacy** | ตารางเดิมขององค์กร (~900 ตาราง) — เข้าถึงผ่าน SQL ใน env เท่านั้น ไม่ map ใน Prisma |
-| **แอปใหม่** | `otp_verifications`, `notifications`, `promotions`, `articles`, `support_tickets`, `app_guides` |
+| **Legacy** | ตารางเดิมขององค์กร (~900 ตาราง) — อ่าน/เขียนผ่าน SQL จากไฟล์ใน **`LEGACY_SQL_DIR`** (ค่าเริ่มต้น `config/legacy-sql/*.sql`) ไม่ map เป็น ORM |
+| **แอปใหม่** | `otp_verifications`, `notifications`, `promotions`, `articles`, `support_tickets`, `app_guides`, `customer_liff_links`, … |
 | **ระบบผู้ใช้ภายใน** | `User`, `Role`, `Permission`, `Otp` (อีเมล), `FileUpload`, `AuditLog`, `IdempotencyRecord` ฯลฯ |
 
-การตัดงวดและรับ bill payment ทำที่ระบบองค์กร — API นี้รับ `POST /integrations/installment-notify` แล้วส่งแจ้งเตือนลูกค้า (LINE / in-app) เท่านั้น
+การตัดงวดและรับ bill payment ทำที่ระบบองค์กร — API นี้รับ `POST /integrations/installment-notify` แล้วส่งแจ้งเตือนลูกค้า (LINE / in-app) เป็นหลัก
 
 ---
 
-## 2. ตารางแอปลูกค้า / CMS
+## 2. การเชื่อมต่อและเลเยอร์ข้อมูล
+
+- **Connection pool:** `mysql2/promise` — ตั้งค่า `DATABASE_URL` (รูปแบบ `mysql://…`)
+- **การเรียกใช้ในโค้ด:** `src/core/db/client.ts` ส่งออก `pool` และ object ชื่อ `prisma` ที่มีเฉพาะ `$queryRawUnsafe` / `$executeRawUnsafe` / `$disconnect` เพื่อความเข้ากันได้กับโค้ดเดิม
+- **ไม่มี** Prisma schema / `prisma migrate` ใน repository นี้ — สคีมาแอปใหม่ใช้สคริปต์ SQL จากโฟลเดอร์ **`db/`** หรือ pipeline deploy ของทีม (ดู `npm run release` ใน `package.json`)
+
+---
+
+## 3. ตารางแอปลูกค้า / CMS
 
 ### `otp_verifications`
 
@@ -26,7 +34,7 @@
 | phone | VARCHAR(255) | เบอร์ไทย normalize ฝั่งแอป |
 | otp_code | VARCHAR(191) | **bcrypt hash** ของรหัส SMS ตัวเลข **4 หลัก** |
 | ref_code | VARCHAR(64) | อ้างอิงแสดงใน SMS |
-| expires_at | DATETIME(3) | หมดอายุ (ค่าเริ่ม 5 นาที) |
+| expires_at | DATETIME(3) | หมดอายุ |
 | verified_at | DATETIME(3) NULL | เวลายืนยันสำเร็จ |
 
 ดัชนี: `(phone, ref_code)`, `expires_at`
@@ -35,7 +43,8 @@
 
 ### `notifications` (CustomerAppNotification)
 
-In-app แจ้งเตือนลูกค้า — `idno` = **รหัสลูกค้า legacy** ที่ใช้เป็น identity เดียวกับ JWT `sub` (เช่น `COMPID:IDNO` หรือรูปแบบที่ระบบออกให้) **ค่าในคอลัมน์ต้องตรงกับ `sub` ที่ลูกค้าใช้ล็อกอิน** มิฉะนั้น `GET /notifications` จะไม่เห็นแถว — ข้อมูลทดสอบใช้สคริปต์ `sql/dba/seed_sample_notifications.sql` (ลบด้วย prefix `samplenoti-` / เงื่อนไขที่สคริปต์กำหนด)
+In-app แจ้งเตือนลูกค้า — `idno` = **รหัสลูกค้า legacy** ต้องตรงกับ JWT `sub`  
+ข้อมูลทดสอบ: `sql/dba/seed_sample_notifications.sql`
 
 | คอลัมน์ | หมายเหตุ |
 |---------|----------|
@@ -48,38 +57,54 @@ In-app แจ้งเตือนลูกค้า — `idno` = **รหัส
 
 ### `promotions` / `articles` / `app_guides`
 
-เนื้อหา CMS สาธารณะ — ดู schema สำหรับฟิลด์ครบถ้วน; มีดัชนีตาม `published_at`, `is_active` + ช่วงวันที่โปรโมชัน
+เนื้อหา CMS สาธารณะ — มีดัชนีตาม `published_at`, `is_active` และช่วงวันที่โปรโมชัน (รายละเอียดคอลัมน์ดูสคริปต์สร้างตารางใน `db/`)
 
 ---
 
 ### `support_tickets`
 
-ตั๋วติดต่อ — `idno` = รหัสลูกค้า legacy (สอดคล้อง JWT `sub` / การ map จาก `acct_cust`)
+ตั๋วติดต่อ — `idno` = รหัสลูกค้า legacy (สอดคล้อง JWT `sub`)
 
 ---
 
-## 3. ตารางระบบภายใน (สรุป)
+### `customer_liff_links`
 
-- **User / Role / Permission / UserRole / RolePermission** — RBAC แอดมิน
-- **Otp** — OTP อีเมล (เก็บ `codeHash`)
-- **FileUpload** — อัปโหลดสตรีม
+ผูก **LINE user** กับลูกค้า legacy — ใช้ร่วมกับ `line-user-by-customer.sql` (แนะนำให้ query จากตารางนี้)
+
+---
+
+## 4. ตารางระบบภายใน (สรุป)
+
+- **User / Role / Permission / UserRole / RolePermission** — RBAC
+- **Otp** — OTP อีเมล (`codeHash`)
+- **FileUpload** — metadata อัปโหลด
 - **AuditLog** — บันทึกการกระทำสำคัญ
-- **IdempotencyRecord** — idempotency HTTP (ฟีเจอร์เดิม)
+- **IdempotencyRecord** — idempotency HTTP (ถ้าเปิดใช้)
 
-ตารางอีคอมเมิร์ซ (`Product`, `Order`, …) อาจยังอยู่ใน DB แต่ไม่ถูก mount ใน router ปัจจุบัน
-
----
-
-## 4. Legacy MariaDB
-
-- สคีมาตารางอ้างอิงจาก repo `db/` (`เฉพาะตารางฐานข้อมูลที่เกี่ยวข้อง.sql` ฯลฯ) — การอ่าน/เขียน legacy กำหนดผ่าน `LEGACY_*_SQL` ใน environment
-- **LINE user id สำหรับ Push:** แหล่งหลักคือตาราง **`customer_liff_links`** (Prisma) + SQL `LEGACY_GET_LINE_USER_BY_CUSTOMER_SQL` — ไม่บังคับเพิ่มคอลัมน์ LINE บน `acct_cust`
-- (ทางเลือกเก่า) คอลัมน์ LINE บน `acct_cust`: `sql/manual/001_alter_acc_cus_line.sql` — ใช้เฉพาะเมื่อองค์กรยังเก็บ `line_user_id` ที่นั่น
-- คู่มือดัชนีแนะนำ: `sql/manual/002_suggested_legacy_indexes.sql`
-- `LEGACY_MARK_INSTALLMENT_PAID_SQL` — ออปชัน สำหรับสคริปต์/เครื่องมือภายนอก (ไม่ใช้ในโฟลว์อนุมัติผ่านแอปแล้ว)
+ตารางอีคอมเมิร์ซ (`Product`, `Order`, …) อาจยังอยู่ใน DB เดียวกันแต่ไม่ถูก mount ใน router ปัจจุบัน
 
 ---
 
-## 5. Migrations
+## 5. Legacy MariaDB
 
-รัน `npx prisma migrate deploy` บน production หลัง build — migration ล่าสุดรวมถึงการลบตาราง `installment_payment_claims` (ถ้ามีจากชุดเก่า)
+- อ้างอิงสคีมาจาก repo **`db/`** (`เฉพาะตารางฐานข้อมูลที่เกี่ยวข้อง.sql` ฯลฯ)
+- **LINE user id สำหรับ Push:** แหล่งหลักคือ **`customer_liff_links`** + ไฟล์ `line-user-by-customer.sql`
+- (ทางเลือกเก่า) คอลัมน์ LINE บน `acct_cust`: `sql/manual/001_alter_acc_cus_line.sql`
+- ดัชนีแนะนำ: `sql/manual/002_suggested_legacy_indexes.sql`
+- `mark-installment-paid.sql` — ออปชัน สำหรับสคริปต์/เครื่องมือภายนอก
+
+---
+
+## 6. Migrations / การอัปเดตสคีมา
+
+1. ใช้สคริปต์ SQL ที่ทีมกำหนด (เช่นใน `db/` หรือ `sql/`) บน MariaDB เป้าหมาย
+2. หลัง deploy ตรวจสอบ health และตาราง `admin_auth_*` ถ้าใช้ Better Auth
+3. ไม่รันคำสั่ง `npx prisma migrate deploy` ใน repo นี้ — ไม่มี Prisma migration เป็นส่วนของแพ็กเกจ
+
+---
+
+## 7. อ้างอิง
+
+- **`API_DOCUMENTATION.md`** — endpoint และ auth
+- **`DEVELOPMENT_RULES.md`** — พารามิเตอร์ legacy SQL, การทดสอบ OTP
+- **`sql/dba/HANDOFF_SKM_EASY_V2.sql`** — handoff DBA

@@ -25,7 +25,7 @@ async function main() {
   );
   if (!urows.length) {
     // eslint-disable-next-line no-console
-    console.error(`ไม่พบแอดมิน ${EMAIL} — รัน prisma db seed ก่อน`);
+    console.error(`ไม่พบแอดมิน ${EMAIL} — รัน npm run seed:admin ก่อน`);
     process.exit(1);
   }
 

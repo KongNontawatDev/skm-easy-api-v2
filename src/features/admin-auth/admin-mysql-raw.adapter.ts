@@ -1,11 +1,15 @@
 /**
- * Better Auth — adapter ฐานข้อมูลผ่าน Prisma `$queryRaw` / `$executeRaw` เท่านั้น (ไม่ใช้ Prisma model delegate)
- * อิงพฤติกรรมจาก `@better-auth/prisma-adapter` แต่ส่ง SQL ไปที่ MariaDB โดยตรง
+ * Better Auth — adapter ฐานข้อมูลผ่าน raw SQL (`$queryRawUnsafe` / `$executeRawUnsafe`)
  */
 import { BetterAuthError } from '@better-auth/core/error';
 import { createAdapterFactory } from '@better-auth/core/db/adapter';
 import type { CleanedWhere, JoinConfig } from '@better-auth/core/db/adapter';
-import type { PrismaClient } from '@prisma/client';
+
+/** ชั้น SQL ดิบ (เช่น อ็อบเจ็กต์ `prisma` จาก `core/db/client`) */
+export type RawSqlDb = {
+  $queryRawUnsafe<T>(sql: string, ...params: unknown[]): Promise<T>;
+  $executeRawUnsafe(sql: string, ...params: unknown[]): Promise<number>;
+};
 
 const MODEL_TABLE: Record<string, string> = {
   adminAuthUser: 'admin_auth_user',
@@ -147,9 +151,9 @@ function hasRootUniqueWhereCondition(
   });
 }
 
-export function adminMysqlRawAdapter(prisma: PrismaClient) {
+export function adminMysqlRawAdapter(db: RawSqlDb) {
   const createCustomAdapter =
-    (db: PrismaClient) =>
+    (executor: RawSqlDb) =>
     ({
       getFieldName,
       getModelName,
@@ -307,11 +311,11 @@ export function adminMysqlRawAdapter(prisma: PrismaClient) {
       };
 
       async function queryRows(sql: string, params: unknown[]): Promise<Record<string, unknown>[]> {
-        return db.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
+        return executor.$queryRawUnsafe<Record<string, unknown>[]>(sql, ...params);
       }
 
       async function exec(sql: string, params: unknown[]): Promise<number> {
-        const r = await db.$executeRawUnsafe(sql, ...params);
+        const r = await executor.$executeRawUnsafe(sql, ...params);
         return typeof r === 'number' ? r : Number(r);
       }
 
@@ -563,14 +567,14 @@ export function adminMysqlRawAdapter(prisma: PrismaClient) {
 
   const adapterOptions = {
     config: {
-      adapterId: 'prisma-mysql-raw',
-      adapterName: 'Prisma MySQL Raw',
+      adapterId: 'mysql2-raw',
+      adapterName: 'MySQL2 Raw SQL',
       usePlural: false,
       supportsUUIDs: false,
       supportsArrays: false,
       transaction: false as const,
     },
-    adapter: createCustomAdapter(prisma),
+    adapter: createCustomAdapter(db),
   };
 
   const adapter = createAdapterFactory(adapterOptions);

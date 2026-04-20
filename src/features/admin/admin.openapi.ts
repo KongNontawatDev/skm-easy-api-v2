@@ -35,7 +35,7 @@ import {
   adminUpdateArticle,
   adminUpdateGuide,
   adminUpdatePromotion,
-} from './admin.prisma-raw.js';
+} from './admin.db-raw.js';
 
 export function registerAdminRoutes(api: OpenAPIHono) {
   api.use('*', requireStaff);

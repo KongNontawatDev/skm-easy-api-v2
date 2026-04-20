@@ -8,7 +8,7 @@ import type { MiddlewareHandler } from 'hono';
 import { env } from '../../core/env/config.js';
 import { jsonSuccess, openapiJsonSuccess, openapiStandardErrors } from '../../core/http/api-response.js';
 import { serviceUnavailable, unauthorized } from '../../core/http/errors.js';
-import { redis } from '../../core/security/redis.client.js';
+import { runtimeKv } from '../../core/security/runtime-kv.js';
 import {
   installmentNotifyPayloadSchema,
   notifyCustomerAfterInstallmentPosting,
@@ -83,7 +83,7 @@ export function registerInstallmentIntegrationRoutes(api: OpenAPIHono) {
     const body = c.req.valid('json');
     if (body.requestId) {
       const dedupeKey = `integration:installment-notify:${body.requestId}`;
-      const set = await redis.set(dedupeKey, '1', 'EX', 600, 'NX');
+      const set = await runtimeKv.set(dedupeKey, '1', 'EX', 600, 'NX');
       if (set === null) {
         return jsonSuccess(
           c,

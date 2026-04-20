@@ -7,7 +7,6 @@ import { newDbId } from '../../core/db/new-id.js';
 import { badRequest } from '../../core/http/errors.js';
 import { logger } from '../../core/logger/logger.js';
 import { dispatchLineNotificationJob } from '../../integrations/line/line-notification-dispatch.js';
-import { bumpCustomerLegacyCache } from '../customer-app/customer-legacy-cached.service.js';
 import { getLineUserIdForCustomer } from '../legacy-sql/legacy-sql.service.js';
 import {
   buildFlexNotifyBubble,
@@ -129,7 +128,6 @@ export async function notifyCustomerAfterInstallmentPosting(
       false,
       nt,
     );
-    await bumpCustomerLegacyCache(legacyCustomerId);
     inAppCreated = true;
   }
 

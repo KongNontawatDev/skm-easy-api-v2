@@ -1,7 +1,5 @@
 import { config } from 'dotenv';
 import { resolve } from 'node:path';
-import { PrismaMariaDb } from '@prisma/adapter-mariadb';
-import { PrismaClient } from '@prisma/client';
 
 config({ path: resolve(process.cwd(), '.env.dev') });
 const phone = process.argv[2];
@@ -10,9 +8,8 @@ if (!phone) {
   process.exit(1);
 }
 const refCode = process.argv[3];
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error('DATABASE_URL missing');
-const prisma = new PrismaClient({ adapter: new PrismaMariaDb(url) });
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL missing');
+const { prisma } = await import('../src/core/db/client.js');
 type Row = { otpCode: string };
 const rows = refCode
   ? await prisma.$queryRawUnsafe<Row[]>(

@@ -2,6 +2,7 @@
  * Flex Message templates สำหรับแจ้งเตือน LINE OA (งวดผ่อน / ใบแจ้งหนี้ / ใบเสร็จ)
  * อ้างอิงโครงสร้างตาม LINE Messaging API — https://developers.line.biz/en/docs/messaging-api/using-flex-messages/
  */
+import { LINE_FLEX_BRAND_NAME } from '../../../core/constants.js';
 import { env } from '../../../core/env/config.js';
 
 export const LINE_FLEX_TEMPLATE_KINDS = [
@@ -43,7 +44,7 @@ export type FlexNotifyContext = {
 };
 
 function brandName(): string {
-  return env.LINE_FLEX_BRAND_NAME?.trim() || 'SKM Easy';
+  return LINE_FLEX_BRAND_NAME;
 }
 
 function fmtBaht(n?: number): string | undefined {

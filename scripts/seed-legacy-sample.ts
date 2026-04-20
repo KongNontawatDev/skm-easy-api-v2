@@ -11,14 +11,9 @@
  */
 import { config } from 'dotenv';
 import { resolve } from 'node:path';
-import { PrismaMariaDb } from '@prisma/adapter-mariadb';
-import { PrismaClient } from '@prisma/client';
 
 config({ path: resolve(process.cwd(), '.env.dev') });
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error('DATABASE_URL missing — ใส่ใน .env.dev');
-
-const prisma = new PrismaClient({ adapter: new PrismaMariaDb(url) });
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL missing — ใส่ใน .env.dev');
 
 const C = {
   COMPID: 'SKM',
@@ -45,16 +40,17 @@ const C = {
   TR_VAT: 'VATX',
 } as const;
 
-async function exec(label: string, sql: string): Promise<void> {
-  try {
-    await prisma.$executeRawUnsafe(sql);
-  } catch (e) {
-    console.error(`[${label}] ล้มเหลว:\n${sql.slice(0, 240)}…`);
-    throw e;
-  }
-}
-
 async function main(): Promise<void> {
+  const { prisma } = await import('../src/core/db/client.js');
+  async function exec(label: string, sql: string): Promise<void> {
+    try {
+      await prisma.$executeRawUnsafe(sql);
+    } catch (e) {
+      console.error(`[${label}] ล้มเหลว:\n${sql.slice(0, 240)}…`);
+      throw e;
+    }
+  }
+
   const stmts: { label: string; sql: string }[] = [
     { label: 'ลบ artcolor_table (ตัวอย่าง)', sql: `DELETE FROM artcolor_table WHERE COMPID = '${C.COMPID}' AND ARTNO IN ('${C.ART_CIV}','${C.ART_HIL}')` },
     { label: 'ลบ artmas_car (ตัวอย่าง)', sql: `DELETE FROM artmas_car WHERE COMPID = '${C.COMPID}' AND ARTNO IN ('${C.ART_CIV}','${C.ART_HIL}')` },
@@ -271,5 +267,6 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
+    const { prisma } = await import('../src/core/db/client.js');
     await prisma.$disconnect();
   });

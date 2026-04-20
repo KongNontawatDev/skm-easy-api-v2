@@ -36,16 +36,12 @@ function extractContractRefs(rows: Record<string, unknown>[]): Set<string> {
   return out;
 }
 
-export async function bumpCustomerLegacyCache(_legacyCustomerId: string): Promise<void> {
-  /* no-op */
-}
-
-export async function listContractsForCustomerCached(legacyCustomerId: string): Promise<Record<string, unknown>[]> {
+export async function listContractsForCustomerApi(legacyCustomerId: string): Promise<Record<string, unknown>[]> {
   return listContractsForCustomer(legacyCustomerId);
 }
 
 export async function assertCustomerOwnsContract(legacyCustomerId: string, contractRef: string): Promise<void> {
-  const rows = await listContractsForCustomerCached(legacyCustomerId);
+  const rows = await listContractsForCustomerApi(legacyCustomerId);
   if (!extractContractRefs(rows).has(contractRef)) {
     throw forbidden('ไม่มีสิทธิ์เข้าถึงสัญญานี้');
   }
@@ -59,7 +55,7 @@ export async function getContractDetailForCustomer(
   return getContractDetail(contractRef);
 }
 
-export async function listInstallmentsForCustomerCached(
+export async function listInstallmentsForCustomerApi(
   legacyCustomerId: string,
   contractRef: string,
 ): Promise<Record<string, unknown>[]> {
@@ -67,6 +63,6 @@ export async function listInstallmentsForCustomerCached(
   return listInstallmentsByContract(contractRef);
 }
 
-export async function listReceiptsForCustomerCached(legacyCustomerId: string): Promise<Record<string, unknown>[]> {
+export async function listReceiptsForCustomerApi(legacyCustomerId: string): Promise<Record<string, unknown>[]> {
   return listReceiptsForCustomer(legacyCustomerId);
 }

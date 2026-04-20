@@ -1,5 +1,5 @@
 /**
- * Repository สำหรับ auth — query ผู้ใช้ผ่าน Prisma raw SQL
+ * Repository สำหรับ auth — query ผู้ใช้ผ่าน raw SQL (mysql2)
  */
 import { prisma } from '../../core/db/client.js';
 import { newDbId } from '../../core/db/new-id.js';

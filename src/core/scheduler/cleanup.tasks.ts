@@ -24,7 +24,7 @@ export async function runScheduledCleanup(): Promise<void> {
     otpCount = typeof r === 'number' ? r : Number(r);
   } catch (e) {
     if (isMissingTableError(e)) {
-      logger.warn('ข้ามลบ Otp — ไม่มีตารางใน DB (รัน `npx prisma migrate deploy` บนฐานนี้)');
+      logger.warn('ข้ามลบ Otp — ไม่มีตารางใน DB (ตรวจสอบ schema / migration SQL)');
     } else {
       throw e;
     }
@@ -35,7 +35,7 @@ export async function runScheduledCleanup(): Promise<void> {
     await prisma.$executeRawUnsafe('DELETE FROM `User` WHERE `deletedAt` < ?', old);
   } catch (e) {
     if (isMissingTableError(e)) {
-      logger.warn('ข้ามลบ User ที่ลบนานแล้ว — ไม่มีตารางใน DB (รัน `npx prisma migrate deploy` บนฐานนี้)');
+      logger.warn('ข้ามลบ User ที่ลบนานแล้ว — ไม่มีตารางใน DB (ตรวจสอบ schema / migration SQL)');
     } else {
       throw e;
     }

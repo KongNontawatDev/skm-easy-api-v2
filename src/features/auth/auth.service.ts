@@ -13,8 +13,8 @@ import { authRepo, type UserRow } from './auth.repo.js';
 import { renderEmailTemplate } from '../../integrations/email/template.engine.js';
 import { sendMailNow } from '../../integrations/email/mailer.js';
 import { exchangeLineAuthorizationCode, fetchLineProfile } from '../../integrations/line/line.login.js';
-import { redis } from '../../core/security/redis.client.js';
-import { env } from '../../core/env/config.js';
+import { OTP_RATE_LIMIT_MAX, OTP_RATE_LIMIT_WINDOW_SEC } from '../../core/constants.js';
+import { runtimeKv } from '../../core/security/runtime-kv.js';
 import { usersService } from '../users/users.service.js';
 
 function toPrincipal(user: { id: string; email: string; isActive: boolean; isStaff: boolean }): AuthPrincipal {
@@ -80,11 +80,11 @@ export const authService = {
 
   async requestOtp(input: { email: string; purpose: 'login' | 'verify_email' }) {
     const rlKey = `otp:rate:${input.email.toLowerCase()}`;
-    const n = await redis.incr(rlKey);
+    const n = await runtimeKv.incr(rlKey);
     if (n === 1) {
-      await redis.expire(rlKey, env.OTP_RATE_LIMIT_WINDOW_SEC);
+      await runtimeKv.expire(rlKey, OTP_RATE_LIMIT_WINDOW_SEC);
     }
-    if (n > env.OTP_RATE_LIMIT_MAX) {
+    if (n > OTP_RATE_LIMIT_MAX) {
       throw tooManyRequests('ขอรหัส OTP บ่อยเกินไป โปรดลองใหม่ภายหลัง');
     }
     const code = String(randomInt(0, 9_999)).padStart(4, '0');

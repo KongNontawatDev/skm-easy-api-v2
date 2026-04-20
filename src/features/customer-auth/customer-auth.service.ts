@@ -1,7 +1,7 @@
 /**
  * 📌 ไฟล์นี้ทำหน้าที่อะไร
  * - OTP ล็อกอินลูกค้าแอป (เบอร์ไทย) + ออก JWT แบบ role customer
- * - ผูกกับแถว legacy ผ่าน SQL ใน env (ไม่สร้าง User ใน Prisma)
+ * - ผูกกับแถว legacy ผ่าน SQL ใน env (ไม่สร้าง User ผ่าน ORM)
  *
  * 🔐 ความปลอดภัย
  * - โหมด `THAIBULKSMS_OTP_STRATEGY=provider`: Thai Bulk ส่ง SMS + เก็บ `TBS:<token>` ใน DB (ไม่เก็บ PIN)
@@ -14,16 +14,24 @@ import bcrypt from 'bcryptjs';
 import dayjs from 'dayjs';
 import { prisma } from '../../core/db/client.js';
 import { newDbId } from '../../core/db/new-id.js';
+import {
+  OTP_BCRYPT_COST,
+  OTP_RATE_LIMIT_MAX,
+  OTP_RATE_LIMIT_WINDOW_SEC,
+  OTP_VERIFY_LOCK_WINDOW_SEC,
+  OTP_VERIFY_MAX_ATTEMPTS,
+} from '../../core/constants.js';
 import { env } from '../../core/env/config.js';
 import { badRequest, tooManyRequests, unauthorized } from '../../core/http/errors.js';
 import { refreshCustomerSession } from './customer-liff.service.js';
-import { redis } from '../../core/security/redis.client.js';
+import { runtimeKv } from '../../core/security/runtime-kv.js';
 import {
   requestThaiBulkSmsOtp,
   sendThaiBulkSms,
   THAIBULK_PROVIDER_OTP_PREFIX,
   verifyThaiBulkSmsOtp,
 } from '../../integrations/sms/thaibulksms.client.js';
+import { hasLegacyLineLinkUpdateSql } from '../legacy-sql/legacy-sql.service.js';
 import {
   buildBlockedThaiBulkMsisdns,
   isBlockedThaiBulkMsisdn,
@@ -139,9 +147,9 @@ export const customerAuthService = {
     }
 
     const rlKey = `otp:sms:${phone}`;
-    const n = await redis.incr(rlKey);
-    if (n === 1) await redis.expire(rlKey, env.OTP_RATE_LIMIT_WINDOW_SEC);
-    if (n > env.OTP_RATE_LIMIT_MAX) throw tooManyRequests('ขอรหัส OTP บ่อยเกินไป ลองใหม่ภายหลัง');
+    const n = await runtimeKv.incr(rlKey);
+    if (n === 1) await runtimeKv.expire(rlKey, OTP_RATE_LIMIT_WINDOW_SEC);
+    if (n > OTP_RATE_LIMIT_MAX) throw tooManyRequests('ขอรหัส OTP บ่อยเกินไป ลองใหม่ภายหลัง');
 
     const row = await findCustomerByPhone(phone);
     const cusId = pickLegacyCustomerId(row);
@@ -173,7 +181,7 @@ export const customerAuthService = {
 
     const code = otpCode();
     const refCode = randomRef();
-    const otpHash = await bcrypt.hash(code, env.OTP_BCRYPT_COST);
+    const otpHash = await bcrypt.hash(code, OTP_BCRYPT_COST);
 
     const oid = newDbId();
     const createdAt = new Date();
@@ -213,9 +221,9 @@ export const customerAuthService = {
     const attemptKey = `otp:verify:attempt:${phone}`;
 
     const bumpFailedVerifyAttempts = async () => {
-      const n = await redis.incr(attemptKey);
-      if (n === 1) await redis.expire(attemptKey, env.OTP_VERIFY_LOCK_WINDOW_SEC);
-      if (n > env.OTP_VERIFY_MAX_ATTEMPTS) {
+      const n = await runtimeKv.incr(attemptKey);
+      if (n === 1) await runtimeKv.expire(attemptKey, OTP_VERIFY_LOCK_WINDOW_SEC);
+      if (n > OTP_VERIFY_MAX_ATTEMPTS) {
         throw tooManyRequests('พยายามยืนยัน OTP เกินจำนวนที่อนุญาต ลองใหม่ภายหลัง');
       }
     };
@@ -262,7 +270,7 @@ export const customerAuthService = {
       throw unauthorized('รหัส OTP ไม่ถูกต้องหรือหมดอายุ');
     }
 
-    await redis.del(attemptKey);
+    await runtimeKv.del(attemptKey);
     await prisma.$executeRawUnsafe(
       'UPDATE `otp_verifications` SET `verified_at` = ? WHERE `id` = ?',
       new Date(),
@@ -316,7 +324,7 @@ export const customerAuthService = {
           ...vals,
         );
       }
-      if (env.LEGACY_LINE_LINK_UPDATE_SQL?.trim() && (lineUserName || lineUserProfile)) {
+      if (hasLegacyLineLinkUpdateSql() && (lineUserName || lineUserProfile)) {
         try {
           await linkLineProfile({
             lineUserId,
@@ -346,7 +354,7 @@ export const customerAuthService = {
       linePictureUrl: lineUserProfile,
     });
 
-    if (env.LEGACY_LINE_LINK_UPDATE_SQL?.trim()) {
+    if (hasLegacyLineLinkUpdateSql()) {
       try {
         await linkLineProfile({
           lineUserId,

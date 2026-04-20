@@ -77,7 +77,7 @@ export async function bootstrapByLineUserId(lineUserId: string) {
   } catch (e: unknown) {
     if (mysqlErrno(e) === MYSQL_ERR_NO_SUCH_TABLE) {
       throw serviceUnavailable(
-        'ฐานข้อมูลยังไม่มีตารางผูก LINE — รัน `npx prisma migrate deploy` บนฐานที่ API ใช้อยู่',
+        'ฐานข้อมูลยังไม่มีตารางผูก LINE — ตรวจสอบว่าได้รัน migration SQL บนฐานที่ API ใช้อยู่',
       );
     }
     throw e;

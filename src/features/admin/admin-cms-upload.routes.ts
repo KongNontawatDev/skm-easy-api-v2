@@ -10,7 +10,7 @@ import {
   extensionForMime,
   saveCmsImageFromWebStream,
 } from '../cms/cms-upload.service.js';
-import { adminGetArticle, adminGetPromotion, adminUpdateArticle, adminUpdatePromotion } from './admin.prisma-raw.js';
+import { adminGetArticle, adminGetPromotion, adminUpdateArticle, adminUpdatePromotion } from './admin.db-raw.js';
 
 async function parseSingleImageFile(c: Context): Promise<File> {
   const body = await c.req.parseBody();

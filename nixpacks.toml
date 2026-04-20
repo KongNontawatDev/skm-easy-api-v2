@@ -3,11 +3,11 @@
 # ใน Coolify แนะนำ:
 # - Build Pack: Nixpacks, รากโปรเจกต์ = โฟลเดอร์ repo นี้
 # - ตั้งค่า Environment: ดู env.example (อย่างน้อย DATABASE_URL, JWT_*, BETTER_AUTH_URL, SMTP_FROM, NODE_ENV=production)
-# - คำสั่งก่อนเริ่มบริการ / Deploy hook (ครั้งต่อ deploy): npm run release
+# - Deploy hook: npm run release (ตอนนี้แค่ log — migrate DB ทำนอกแอป/SQL เอง)
 # - Port: ให้ Coolify กำหนด PORT (แอปอ่านจาก env อยู่แล้ว)
 # - Health check path: /health
 #
-# หมายเหตุ: nixPkgs ใช้ "..." เพื่อต่อกับแพ็กเก์ที่ provider ใส่ให้แล้ว (เช่น node) — เพิ่ม openssl ให้ Prisma
+# หมายเหตุ: nixPkgs ใช้ "..." เพื่อต่อกับแพ็กเก์ที่ provider ใส่ให้แล้ว (เช่น node) — openssl สำหรับ mysql2 native
 
 [phases.setup]
 nixPkgs = ["...", "openssl"]

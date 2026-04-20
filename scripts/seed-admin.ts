@@ -1,9 +1,20 @@
 /**
  * Seed ขั้นต่ำ: แอดมิน Better Auth (ตาราง admin_auth_*) + โปรโมชันตัวอย่าง
+ * รัน: npx tsx scripts/seed-admin.ts  (ต้องมี DATABASE_URL ใน env / .env.dev)
  */
 import { randomUUID } from 'node:crypto';
+import { config } from 'dotenv';
+import { resolve } from 'node:path';
 import { hashPassword } from 'better-auth/crypto';
-import { prisma } from '../src/core/db/client.js';
+
+config({ path: resolve(process.cwd(), '.env.dev') });
+if (!process.env.DATABASE_URL) {
+  // eslint-disable-next-line no-console
+  console.error('DATABASE_URL ไม่พบ — ตั้งใน .env.dev หรือ environment');
+  process.exit(1);
+}
+
+const { prisma } = await import('../src/core/db/client.js');
 
 async function main() {
   const adminEmail = 'admin@example.com';
@@ -83,7 +94,7 @@ async function main() {
   );
 }
 
-main()
+await main()
   .then(async () => {
     await prisma.$disconnect();
   })

@@ -1,6 +1,7 @@
 /**
  * เครื่องมือแอดมิน — ทดสอบส่งข้อความ LINE OA (ข้อความ / Flex) ไปยังลูกค้าตาม legacy customer id
  */
+import { LINE_FLEX_BRAND_NAME } from '../../core/constants.js';
 import { env } from '../../core/env/config.js';
 import { badRequest, serviceUnavailable } from '../../core/http/errors.js';
 import {
@@ -33,7 +34,7 @@ const TEMPLATE_LABELS_TH: Record<LineOaTestTemplate, string> = {
 };
 
 function lineOaChannelLabel(): string {
-  const brand = env.LINE_FLEX_BRAND_NAME?.trim() || 'SKM Easy';
+  const brand = LINE_FLEX_BRAND_NAME;
   return `LINE OA (${brand})`;
 }
 

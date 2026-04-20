@@ -1,24 +1,25 @@
 /**
  * 📌 ไฟล์นี้ทำหน้าที่อะไร
- * - ชั้นดึง/อัปเดตข้อมูลจาก MariaDB legacy (หลายร้อยตาราง) ด้วย SQL ที่กำหนดใน environment
+ * - ชั้นดึง/อัปเดตข้อมูลจาก MariaDB legacy ด้วย SQL จากไฟล์ใน `config/legacy-sql/` (หรือ `LEGACY_SQL_DIR`)
  *
  * ใช้ในระบบส่วนไหน
  * - ลูกค้าแอป (สัญญา, งวด, ใบเสร็จ, ผูก LINE), แอดมินอนุมัติชำระ (อัปเดตงวด legacy)
  *
  * 🔐 ความปลอดภัย SQL
  * - ค่าจากผู้ใช้ส่งเข้าเสมอผ่านพารามิเตอร์ `?` เท่านั้น — **ห้าม** interpolate string เข้า SQL
- * - ตัว statement มาจาก env (ผู้ deploy เป็นคนกำหนด) — ก่อนรันมี `assertSafeLegacySql` กรองคำสั่งอันตราย
- * - Prisma ใช้ `$queryRawUnsafe(sql, ...params)` เพราะ statement ไม่ทราบตายตัวตอน compile — พารามิเตอร์ยังถูก bind แบบ prepared
+ * - ก่อนรันมี `assertSafeLegacySql` กรองคำสั่งอันตราย
+ * - ใช้ `$queryRawUnsafe(sql, ...params)` ผ่าน mysql2 (prepared / bind พารามิเตอร์)
  *
  * ⚠️ ห้ามแก้ logic bind พารามิเตอร์โดยไม่ทบทวน — เกี่ยวกับ SQL injection
  */
 import { prisma } from '../../core/db/client.js';
 import { env } from '../../core/env/config.js';
 import { serviceUnavailable } from '../../core/http/errors.js';
+import { getLegacySqlTexts } from './legacy-sql-files.js';
 
 export type LegacyRow = Record<string, unknown>;
 
-/** กรอง statement จาก env — ลดความเสี่ยงเมื่อค่า env ถูกแก้ผิดพลาดหรือถูก supply-chain */
+/** กรอง statement — ลดความเสี่ยงเมื่อไฟล์ SQL ถูกแก้ผิดพลาด */
 function assertSafeLegacySql(sql: string, name: string): void {
   const s = sql.trim();
   if (!s) return;
@@ -38,36 +39,36 @@ function assertSafeLegacySql(sql: string, name: string): void {
 /** รัน raw SQL พร้อมพารามิเตอร์แบบ positional (ใช้ ? ใน statement) */
 export async function legacyQuery(sql: string | undefined, params: unknown[], name: string): Promise<LegacyRow[]> {
   if (!sql?.trim()) {
-    throw serviceUnavailable(`ยังไม่ตั้งค่า ${name} — ใส่ SQL ใน environment ตาม DEVELOPMENT_RULES.md`);
+    throw serviceUnavailable(
+      `ยังไม่ตั้งค่า ${name} — สร้างไฟล์ใน ${env.LEGACY_SQL_DIR} ตามชื่อใน legacy-sql-files.ts`,
+    );
   }
   assertSafeLegacySql(sql, name);
   return prisma.$queryRawUnsafe<LegacyRow[]>(sql, ...params);
 }
 
+const q = getLegacySqlTexts;
+
 export async function findCustomerByPhone(phone: string): Promise<LegacyRow | null> {
-  const rows = await legacyQuery(env.LEGACY_ACC_CUS_BY_PHONE_SQL, [phone], 'LEGACY_ACC_CUS_BY_PHONE_SQL');
+  const rows = await legacyQuery(q().accCusByPhone, [phone], 'acc-cus-by-phone.sql');
   return rows[0] ?? null;
 }
 
 export async function listContractsForCustomer(cusId: string): Promise<LegacyRow[]> {
-  return legacyQuery(env.LEGACY_CONTRACTS_BY_CUSTOMER_SQL, [cusId], 'LEGACY_CONTRACTS_BY_CUSTOMER_SQL');
+  return legacyQuery(q().contractsByCustomer, [cusId], 'contracts-by-customer.sql');
 }
 
 export async function getContractDetail(contractRef: string): Promise<LegacyRow | null> {
-  const rows = await legacyQuery(env.LEGACY_CONTRACT_DETAIL_SQL, [contractRef], 'LEGACY_CONTRACT_DETAIL_SQL');
+  const rows = await legacyQuery(q().contractDetail, [contractRef], 'contract-detail.sql');
   return rows[0] ?? null;
 }
 
 export async function listInstallmentsByContract(contractRef: string): Promise<LegacyRow[]> {
-  return legacyQuery(
-    env.LEGACY_INSTALLMENTS_BY_CONTRACT_SQL,
-    [contractRef],
-    'LEGACY_INSTALLMENTS_BY_CONTRACT_SQL',
-  );
+  return legacyQuery(q().installmentsByContract, [contractRef], 'installments-by-contract.sql');
 }
 
 export async function listReceiptsForCustomer(cusId: string): Promise<LegacyRow[]> {
-  return legacyQuery(env.LEGACY_RECEIPTS_BY_CUSTOMER_SQL, [cusId], 'LEGACY_RECEIPTS_BY_CUSTOMER_SQL');
+  return legacyQuery(q().receiptsByCustomer, [cusId], 'receipts-by-customer.sql');
 }
 
 export async function linkLineProfile(params: {
@@ -76,22 +77,24 @@ export async function linkLineProfile(params: {
   lineProfile: string;
   legacyCustomerId: string;
 }): Promise<void> {
-  const sql = env.LEGACY_LINE_LINK_UPDATE_SQL?.trim();
+  const sql = q().lineLinkUpdate?.trim();
   if (!sql) return;
-  await legacyQuery(sql, [params.lineUserId, params.lineUserName, params.lineProfile, params.legacyCustomerId], 'LEGACY_LINE_LINK_UPDATE_SQL');
+  await legacyQuery(sql, [params.lineUserId, params.lineUserName, params.lineProfile, params.legacyCustomerId], 'line-link-update.sql');
 }
 
 export async function getLineUserIdForCustomer(legacyCustomerId: string): Promise<string | null> {
-  const rows = await legacyQuery(
-    env.LEGACY_GET_LINE_USER_BY_CUSTOMER_SQL,
-    [legacyCustomerId],
-    'LEGACY_GET_LINE_USER_BY_CUSTOMER_SQL',
-  );
+  const rows = await legacyQuery(q().lineUserByCustomer, [legacyCustomerId], 'line-user-by-customer.sql');
   const v = rows[0]?.line_user_id ?? rows[0]?.lineUserId;
   return typeof v === 'string' && v.length > 0 ? v : null;
 }
 
 export async function markLegacyInstallmentPaid(args: unknown[]): Promise<void> {
-  if (!env.LEGACY_MARK_INSTALLMENT_PAID_SQL?.trim()) return;
-  await legacyQuery(env.LEGACY_MARK_INSTALLMENT_PAID_SQL, args, 'LEGACY_MARK_INSTALLMENT_PAID_SQL');
+  const sql = q().markInstallmentPaid?.trim();
+  if (!sql) return;
+  await legacyQuery(sql, args, 'mark-installment-paid.sql');
+}
+
+/** มี SQL อัปเดต legacy ตอนผูก LINE หรือไม่ */
+export function hasLegacyLineLinkUpdateSql(): boolean {
+  return Boolean(q().lineLinkUpdate?.trim());
 }

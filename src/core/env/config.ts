@@ -21,17 +21,6 @@ for (const file of envFileCandidates) {
   }
 }
 
-/** ค่าจาก dotenv เป็นสตริง — ห้ามใช้ `z.coerce.boolean()` กับ `"false"` เพราะ `Boolean("false") === true` */
-function parseEnvBoolean(v: unknown, defaultVal: boolean): boolean {
-  if (v === undefined || v === null || v === '') return defaultVal;
-  if (typeof v === 'boolean') return v;
-  if (typeof v === 'number') return v !== 0;
-  const s = String(v).trim().toLowerCase();
-  if (['true', '1', 'yes', 'on'].includes(s)) return true;
-  if (['false', '0', 'no', 'off'].includes(s)) return false;
-  return defaultVal;
-}
-
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(3000),
@@ -49,20 +38,12 @@ const envSchema = z.object({
     (v) => (v === '' || v === undefined || v === null ? undefined : v),
     z.string().min(32).optional(),
   ),
-  JWT_ACCESS_TTL_SEC: z.coerce.number().default(900),
-  JWT_REFRESH_TTL_SEC: z.coerce.number().default(60 * 60 * 24 * 7),
-  HTTP_LOG_ENABLED: z.preprocess((v) => parseEnvBoolean(v, true), z.boolean()),
-  AUDIT_LOG_ENABLED: z.preprocess((v) => parseEnvBoolean(v, true), z.boolean()),
   CORS_ORIGINS: z.string().default('*'),
   /**
    * origin เพิ่มเติมสำหรับ Better Auth (คั่นด้วย comma) — ใช้เมื่อ URL แอดมินไม่อยู่ใน CORS_ORIGINS
    * เช่น `https://admin.example.com`
    */
   ADMIN_APP_ORIGINS: z.string().default(''),
-  RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
-  RATE_LIMIT_MAX: z.coerce.number().default(120),
-  ABUSE_BLOCK_THRESHOLD: z.coerce.number().default(300),
-  ABUSE_BLOCK_TTL_SEC: z.coerce.number().default(3600),
   SMTP_HOST: z.string().default('localhost'),
   SMTP_PORT: z.coerce.number().default(1025),
   SMTP_USER: z.string().optional(),
@@ -73,7 +54,6 @@ const envSchema = z.object({
   LINE_LOGIN_CHANNEL_ID: z.string().optional(),
   LINE_LOGIN_CHANNEL_SECRET: z.string().optional(),
   LINE_LOGIN_CALLBACK_URL: z.string().url().optional(),
-  LINE_FLEX_BRAND_NAME: z.string().min(1).default('SKM Easy'),
   LINE_FLEX_HERO_IMAGE_URL: z.string().url().optional(),
   LINE_LIFF_INVOICE_URL: z.string().url().optional(),
   LINE_LIFF_RECEIPT_URL: z.string().url().optional(),
@@ -94,14 +74,8 @@ const envSchema = z.object({
     (v) => (v === '' || v === undefined || v === null ? undefined : v),
     z.string().email().optional(),
   ),
-  LEGACY_ACC_CUS_BY_PHONE_SQL: z.string().optional(),
-  LEGACY_CONTRACTS_BY_CUSTOMER_SQL: z.string().optional(),
-  LEGACY_CONTRACT_DETAIL_SQL: z.string().optional(),
-  LEGACY_INSTALLMENTS_BY_CONTRACT_SQL: z.string().optional(),
-  LEGACY_RECEIPTS_BY_CUSTOMER_SQL: z.string().optional(),
-  LEGACY_LINE_LINK_UPDATE_SQL: z.string().optional(),
-  LEGACY_GET_LINE_USER_BY_CUSTOMER_SQL: z.string().optional(),
-  LEGACY_MARK_INSTALLMENT_PAID_SQL: z.string().optional(),
+  /** โฟลเดอร์ไฟล์ `.sql` สำหรับ legacy (สัมพัทธ์จาก cwd) — ดู `config/legacy-sql/` */
+  LEGACY_SQL_DIR: z.string().min(1).default('config/legacy-sql'),
   THAIBULKSMS_API_KEY: z.string().optional(),
   THAIBULKSMS_API_SECRET: z.string().optional(),
   THAIBULKSMS_SENDER: z.string().optional(),
@@ -123,15 +97,6 @@ const envSchema = z.object({
     (v) => (v === '' || v === undefined || v === null ? undefined : v),
     z.string().optional(),
   ),
-  OTP_BCRYPT_COST: z.coerce.number().min(4).max(14).default(10),
-  OTP_RATE_LIMIT_MAX: z.coerce.number().min(1).default(5),
-  OTP_RATE_LIMIT_WINDOW_SEC: z.coerce.number().min(60).default(900),
-  OTP_VERIFY_MAX_ATTEMPTS: z.coerce.number().min(3).default(10),
-  OTP_VERIFY_LOCK_WINDOW_SEC: z.coerce.number().min(60).default(900),
-  /** โฟลเดอร์เก็บไฟล์อัปโหลด CMS (รูปโปรโมชัน / ปกบทความ) — relative จาก cwd */
-  UPLOAD_ROOT: z.string().default('data/uploads'),
-  /** ขนาดรูปสูงสุดต่อไฟล์ (ไบต์) */
-  MAX_UPLOAD_IMAGE_BYTES: z.coerce.number().min(1024).default(8 * 1024 * 1024),
 });
 
 export type AppConfig = z.infer<typeof envSchema> & {

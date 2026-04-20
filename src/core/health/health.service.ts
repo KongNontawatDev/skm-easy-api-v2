@@ -30,7 +30,7 @@ export async function getHealthReport(): Promise<HealthReport> {
   let error: string | undefined;
 
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await prisma.$queryRawUnsafe<unknown[]>('SELECT 1');
     checks.database = 'ok';
   } catch (e) {
     error = appendError(error, 'database', (e as Error).message);

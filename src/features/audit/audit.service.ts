@@ -8,7 +8,7 @@
  */
 import { prisma } from '../../core/db/client.js';
 import { newDbId } from '../../core/db/new-id.js';
-import { env } from '../../core/env/config.js';
+import { AUDIT_LOG_ENABLED } from '../../core/constants.js';
 import { auditLogger, logger } from '../../core/logger/logger.js';
 
 /**
@@ -26,7 +26,7 @@ export async function recordAudit(input: {
   userAgent?: string | null;
   meta?: unknown;
 }) {
-  if (!env.AUDIT_LOG_ENABLED) return;
+  if (!AUDIT_LOG_ENABLED) return;
   const id = newDbId();
   const createdAt = new Date();
   const metaJson = input.meta === undefined ? null : JSON.stringify(input.meta);
