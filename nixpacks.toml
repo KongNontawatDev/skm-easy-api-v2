@@ -12,6 +12,14 @@
 [phases.setup]
 nixPkgs = ["...", "openssl"]
 
+[phases.install]
+dependsOn = ["setup"]
+cmds = ["npm ci"]
+
+[phases.build]
+dependsOn = ["install"]
+cmds = ["npm run build"]
+
 [variables]
 NIXPACKS_NODE_VERSION = "22"
 
