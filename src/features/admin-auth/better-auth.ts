@@ -8,6 +8,7 @@
  * - [Hono](https://www.better-auth.com/docs/integrations/hono) — mount handler + CORS + `credentials`
  */
 import { betterAuth } from 'better-auth';
+import { bearer } from 'better-auth/plugins';
 import { env } from '../../core/env/config.js';
 import { prisma } from '../../core/db/client.js';
 import { adminMysqlRawAdapter } from './admin-mysql-raw.adapter.js';
@@ -64,4 +65,5 @@ export const adminAuth = betterAuth({
   session: { modelName: 'adminAuthSession' },
   account: { modelName: 'adminAuthAccount' },
   verification: { modelName: 'adminAuthVerification' },
+  plugins: [bearer()],
 });
